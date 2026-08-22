@@ -19,17 +19,17 @@ class PaymentMethod(str, Enum):
     WALLET = "wallet"
 
 
-class OrdersBase(BaseModel):
+class OrderBase(BaseModel):
     pass
 
 
-class OrdersCreate(OrdersBase):
+class OrderCreate(OrderBase):
     items: list[OrderItemsCreate]
     payment_method: str
     discount: str | None = None
 
 
-class OrdersResponse(OrdersBase):
+class OrderResponse(OrderBase):
     model_config = ConfigDict(from_attributes=True)
 
     order_id: int
@@ -41,7 +41,7 @@ class OrdersResponse(OrdersBase):
     payment_method: PaymentMethod
 
 
-class OrderUpdateById(OrdersBase):
+class OrderUpdateById(OrderBase):
     order_id: int
 
 

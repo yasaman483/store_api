@@ -14,4 +14,7 @@ class OrderItems(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False)
 
-    order = relationship("Orders", back_populates="order_items")
+    order = relationship(
+        "Order", back_populates="order_items")
+    products = relationship(
+        "Product", back_populates="order_items")

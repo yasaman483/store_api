@@ -5,9 +5,9 @@ from datetime import date
 from schemas.people import Roles
 
 
-class People(Base):
+class Person(Base):
     __tablename__ = "people"
-    people_id: Mapped[int] = mapped_column(
+    user_id: Mapped[int] = mapped_column(
         Integer, autoincrement=True, primary_key=True, nullable=False)
     first_name: Mapped[str] = mapped_column(String(50), nullable=False)
     last_name: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -18,4 +18,8 @@ class People(Base):
     city: Mapped[str] = mapped_column(String(50), nullable=False)
     role: Mapped[Roles] = mapped_column(SQLEnum(Roles), nullable=False)
 
-    discount_people = relationship("DiscountPeople", back_populates="people")
+    person = relationship("Wallet", back_populates="customer")
+    discounts = relationship("DiscountGranted", back_populates="people")
+    employee_info = relationship(
+        "EmployeeInfo", back_populates="employee", cascade="all, delete-orphan")
+    orders = relationship("Order", back_populates="customer")

@@ -1,20 +1,25 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from models.people import People
+from models.people import Person
 from models.order_items import OrderItems
-from models.orders import Orders
+from models.orders import Order
 from schemas.order_items import OrderItemsUpdate, OrderItemsDelete
 from schemas.orders import OrderStatus, OrderUpdateById
-from models.products import Products
+from models.products import Product
 from models.discount import Discount
-from models.discount_people import DiscountPeople
+from models.discount_granted import DiscountGranted
 from schemas.discount import DiscountType
 from decimal import Decimal
 from models.payment_history import PaymentHistory
+from datetime import datetime, UTC
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-async def get_order_items(order: OrderUpdateById, current_user: People, db: AsyncSession):
+async def get_order_items(order: OrderUpdateById, current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     result = await db.execute(select(OrderItems).where(
         OrderItems.order_id == order.order_id))
 
@@ -24,29 +29,68 @@ async def get_order_items(order: OrderUpdateById, current_user: People, db: Asyn
         raise HTTPException(
             status_code=404, detail=f"Order {order.order_id} not found")
 
-    result = await db.execute(select(Orders).where(
-        Orders.order_id == order.order_id))
+    result = await db.execute(select(Order).where(
+        Order.order_id == order.order_id))
 
     searched_order = result.scalar_one_or_none()
 
-    if searched_order.customer_id != current_user.people_id:
+    if searched_order.customer_id != current_user.user_id:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Get order items failed",
+            "method": "POST",
+            "error": "Not authorized to get order items.",
+            "path": "/order_items/get_order_item",
+            "user_id": current_user.user_id,
+            "order_id": searched_order.order_id,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
+
         raise HTTPException(
             status_code=403, detail="Not authorized to get this order")
+
+    end_time = datetime.now(UTC)
+    info = {
+        "event": "Get order items succeeded",
+        "method": "POST",
+        "path": "/order_items/get_order_item",
+        "user_id": current_user.user_id,
+        "order_id": order.order_id,
+        "status_code": 200,
+        "duration": (end_time - start_time).total_seconds()
+    }
+    logger.info(info)
 
     return order_items
 
 
-async def update_order_item(order: OrderUpdateById, order_items: list[OrderItemsUpdate], current_user: People, db: AsyncSession):
+async def update_order_item(order: OrderUpdateById, order_items: list[OrderItemsUpdate], current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     try:
-        result = await db.execute(select(Orders).where(
-            Orders.order_id == order.order_id))
+        result = await db.execute(select(Order).where(
+            Order.order_id == order.order_id))
 
         searched_order = result.scalar_one_or_none()
 
         if not searched_order:
             raise HTTPException(status_code=404, detail='No order item found')
 
-        if searched_order.customer_id != current_user.people_id:
+        if searched_order.customer_id != current_user.user_id:
+            end_time = datetime.now(UTC)
+            error = {
+                "event": "Update order items failed",
+                "method": "POST",
+                "error": "Not authorized to get order items.",
+                "path": "/order_items/update_order_item",
+                "user_id": current_user.user_id,
+                "order_id": searched_order.order_id,
+                "status_code": 403,
+                "duration": (end_time - start_time).total_seconds()
+            }
+            logger.error(error)
+
             raise HTTPException(
                 status_code=403, detail="Not authorized to  update the order")
 
@@ -57,8 +101,8 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
         updated_list = []
         total_amount = 0
         for i in range(len(order_items)):
-            result = await db.execute(select(Products).where(
-                Products.product_name == order_items[i].product_name))
+            result = await db.execute(select(Product).where(
+                Product.product_name == order_items[i].product_name))
 
             product = result.scalar_one_or_none()
 
@@ -125,8 +169,8 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
             discount = result.scalar_one_or_none()
 
             if discount:
-                result = await db.execute(select(DiscountPeople).where(DiscountPeople.discount_id ==
-                                                                       discount.discount_id, DiscountPeople.order_id == order.order_id))
+                result = await db.execute(select(DiscountGranted).where(DiscountGranted.discount_id ==
+                                                                        discount.discount_id, DiscountGranted.order_id == order.order_id))
 
                 person_discount = result.scalar_one_or_none()
 
@@ -150,110 +194,164 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
         if payment_history:
             payment_history.payment_amount = searched_order.total_amount_discounted
 
+        end_time = datetime.now(UTC)
+        info = {
+            "event": "Update order items succeeded",
+            "method": "POST",
+            "path": "/order_items/update_order_item",
+            "user_id": current_user.user_id,
+            "order_id": order.order_id,
+            "status_code": 200,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.info(info)
+
         await db.commit()
         return updated_list
 
     except Exception as ex:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Update order items failed",
+            "method": "POST",
+            "error": f"{ex}",
+            "path": "/order_items/update_order_item",
+            "user_id": current_user.user_id,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
+
         await db.rollback()
         raise ex
 
 
-async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItemsDelete], current_user: People, db: AsyncSession):
-    result = await db.execute(select(Orders).where(
-        Orders.order_id == order.order_id))
+async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItemsDelete], current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
+    try:
+        result = await db.execute(select(Order).where(
+            Order.order_id == order.order_id))
 
-    searched_order = result.scalar_one_or_none()
+        searched_order = result.scalar_one_or_none()
 
-    if not searched_order:
-        raise HTTPException(status_code=404, detail='No order item found')
+        if not searched_order:
+            raise HTTPException(status_code=404, detail='No order item found')
 
-    if searched_order.customer_id != current_user.people_id:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to  update the order")
+        if searched_order.customer_id != current_user.user_id:
+            end_time = datetime.now(UTC)
+            error = {
+                "event": "Delete order items failed",
+                "method": "POST",
+                "error": "Not authorized to get order items.",
+                "path": "/order_items/delete_order_item",
+                "user_id": current_user.user_id,
+                "order_id": searched_order.order_id,
+                "status_code": 403,
+                "duration": (end_time - start_time).total_seconds()
+            }
+            logger.error(error)
 
-    if searched_order.order_status != OrderStatus.UNCONFIRMED:
-        raise HTTPException(
-            status_code=400, detail='Not allowed to delete the order anymore')
+            raise HTTPException(
+                status_code=403, detail="Not authorized to delete the order items")
 
-    for i in range(len(order_items)):
-        result = await db.execute(select(Products).where(
-            Products.product_name == order_items[i].product_name))
+        if searched_order.order_status != OrderStatus.UNCONFIRMED:
+            raise HTTPException(
+                status_code=400, detail='Not allowed to delete the order anymore')
 
-        product = result.scalar_one_or_none()
+        for i in range(len(order_items)):
+            result = await db.execute(select(Product).where(
+                Product.product_name == order_items[i].product_name))
 
-        if product is None:
-            raise HTTPException(status_code=404, detail='Product not found')
+            product = result.scalar_one_or_none()
 
-        result = await db.execute(select(OrderItems).where(
-            OrderItems.order_id == order.order_id, OrderItems.product_id == product.product_id))
+            if product is None:
+                raise HTTPException(
+                    status_code=404, detail='Product not found')
 
-        searched_order_item = result.scalar_one_or_none()
+            result = await db.execute(select(OrderItems).where(
+                OrderItems.order_id == order.order_id, OrderItems.product_id == product.product_id))
 
-        if searched_order_item is None:
-            raise HTTPException(status_code=404, detail='Order item not found')
+            searched_order_item = result.scalar_one_or_none()
 
-        product.remain_in_stock += searched_order_item.quantity
-        searched_order.total_amount_without_discount -= searched_order_item.quantity * \
-            searched_order_item.unit_price
+            if searched_order_item is None:
+                raise HTTPException(
+                    status_code=404, detail='Order item not found')
 
-        await db.delete(searched_order_item)
+            product.remain_in_stock += searched_order_item.quantity
+            searched_order.total_amount_without_discount -= searched_order_item.quantity * \
+                searched_order_item.unit_price
 
-    await db.flush()
+            await db.delete(searched_order_item)
 
-    result = await db.execute(select(func.count()).select_from(OrderItems).where(
-        OrderItems.order_id == order.order_id))
+        await db.flush()
 
-    remaining_items = result.scalar_one()
+        result = await db.execute(select(func.count()).select_from(OrderItems).where(
+            OrderItems.order_id == order.order_id))
 
-    if remaining_items == 0:
-        await db.delete(order)
-        if searched_order.discount:
+        remaining_items = result.scalar_one()
+
+        if remaining_items == 0:
+            await db.delete(order)
+            if searched_order.discount:
+                result = await db.execute(select(Discount).where(
+                    Discount.discount_name == searched_order.discount))
+
+                user_discount = result.scalar_one_or_none()
+
+                if user_discount:
+                    result = await db.execute(select(DiscountGranted).where(DiscountGranted.discount_id ==
+                                                                            user_discount.discount_id, DiscountGranted.order_id == order.order_id))
+                    person_discount = result.scalar_one_or_none()
+
+                    if person_discount:
+                        person_discount.used = False
+                        person_discount.used_at = None
+
+        elif searched_order.discount:
             result = await db.execute(select(Discount).where(
                 Discount.discount_name == searched_order.discount))
 
-            user_discount = result.scalar_one_or_none()
+            discount = result.scalar_one_or_none()
 
-            if user_discount:
-                result = await db.execute(select(DiscountPeople).where(DiscountPeople.discount_id ==
-                                                                       user_discount.discount_id, DiscountPeople.order_id == order.order_id))
+            if discount:
+                result = await db.execute(select(DiscountGranted).where(DiscountGranted.discount_id ==
+                                                                        discount.discount_id, DiscountGranted.order_id == order.order_id))
                 person_discount = result.scalar_one_or_none()
 
                 if person_discount:
-                    person_discount.used = False
-                    person_discount.used_at = None
+                    if discount.discount_type == DiscountType.PERCENT:
+                        searched_order.total_amount_discounted = searched_order.total_amount_without_discount * \
+                            (Decimal("100")-discount.amount)/Decimal("100")
+                    else:
+                        searched_order.total_amount_discounted = searched_order.total_amount_without_discount - discount.amount
 
-    elif searched_order.discount:
-        result = await db.execute(select(Discount).where(
-            Discount.discount_name == searched_order.discount))
+                    searched_order.total_amount_discounted = max(
+                        Decimal("0"), searched_order.total_amount_discounted)
 
-        discount = result.scalar_one_or_none()
+        else:
+            searched_order.total_amount_discounted = searched_order.total_amount_without_discount
 
-        if discount:
-            result = await db.execute(select(DiscountPeople).where(DiscountPeople.discount_id ==
-                                                                   discount.discount_id, DiscountPeople.order_id == order.order_id))
-            person_discount = result.scalar_one_or_none()
+        result = await db.execute(select(PaymentHistory).where(
+            PaymentHistory.order_id == order.order_id))
 
-            if person_discount:
-                if discount.discount_type == DiscountType.PERCENT:
-                    searched_order.total_amount_discounted = searched_order.total_amount_without_discount * \
-                        (Decimal("100")-discount.amount)/Decimal("100")
-                else:
-                    searched_order.total_amount_discounted = searched_order.total_amount_without_discount - discount.amount
+        payment_history = result.scalar_one_or_none()
 
-                searched_order.total_amount_discounted = max(
-                    Decimal("0"), searched_order.total_amount_discounted)
+        if payment_history:
+            payment_history.payment_amount = searched_order.total_amount_discounted
 
-    else:
-        searched_order.total_amount_discounted = searched_order.total_amount_without_discount
+        await db.commit()
 
-    result = await db.execute(select(PaymentHistory).where(
-        PaymentHistory.order_id == order.order_id))
+        return {"Item(s) deleted successfully."}
 
-    payment_history = result.scalar_one_or_none()
+    except Exception as ex:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Delete order items failed",
+            "method": "POST",
+            "error": f"{ex}",
+            "path": "/order_items/delete_order_item",
+            "user_id": current_user.user_id,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
 
-    if payment_history:
-        payment_history.payment_amount = searched_order.total_amount_discounted
-
-    await db.commit()
-
-    return {"Item(s) deleted successfully."}
+        await db.rollback()

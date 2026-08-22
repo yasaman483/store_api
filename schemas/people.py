@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import date
-from schemas.report_to import ReportToCreate, ReportToUpdateFromPeople
+from schemas.employee_info import EmployeeInfoCreate, EmployeeInfoUpdateFromPerson
 from enum import Enum
 
 
@@ -10,7 +10,7 @@ class Roles(str, Enum):
     CUSTOMER = 'customer'
 
 
-class PeopleBase(BaseModel):
+class PersonBase(BaseModel):
     first_name: str = Field(min_length=1, max_length=50)
     last_name: str = Field(min_length=1, max_length=50)
     birth_date: date
@@ -19,13 +19,13 @@ class PeopleBase(BaseModel):
     city: str = Field(min_length=1, max_length=100)
 
 
-class PeopleCreate(PeopleBase):
+class PersonCreate(PersonBase):
     password: str = Field(min_length=8)
-    report_to: ReportToCreate | None = None
+    report_to: EmployeeInfoCreate | None = None
 
 
-class PeopleUpdate(BaseModel):
-    people_id: int | None = None
+class PersonUpdate(BaseModel):
+    user_id: int | None = None
     first_name: str | None = None
     last_name: str | None = None
     password: str | None = None
@@ -33,13 +33,13 @@ class PeopleUpdate(BaseModel):
     phone: str | None = None
     address: str | None = None
     city: str | None = None
-    report_to: ReportToUpdateFromPeople | None = None
+    report_to: EmployeeInfoUpdateFromPerson | None = None
 
 
-class PeopleResponse(PeopleBase):
+class PersonResponse(PersonBase):
     model_config = ConfigDict(from_attributes=True)
 
-    people_id: int
+    user_id: int
     role: Roles
 
 
@@ -51,34 +51,8 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str
-    user: PeopleResponse
+    user: PersonResponse
 
 
 class GetId(BaseModel):
-    people_id: int
-
-
-# class GetPhone(BaseModel):
-#     phone: str
-# class CustomerCreate(PeopleBase):
-#     password: str = Field(min_length=8)
-# class EmployeeCreate(PeopleBase):
-#     password: str = Field(min_length=8)
-#     report_to: ReportToCreate
-# class EmployeeUpdateSent(BaseModel):
-#     first_name: str | None = None
-#     last_name: str | None = None
-#     password: str | None = None
-#     birth_date: date | None = None
-#     phone: str | None = None
-#     address: str | None = None
-#     city: str | None = None
-#     report_to: ReportToUpdate | None = None
-# class CustomerUpdate(BaseModel):
-#     first_name: str | None = None
-#     last_name: str | None = None
-#     password: str | None = None
-#     birth_date: date | None = None
-#     phone: str | None = None
-#     address: str | None = None
-#     city: str | None = None
+    user_id: int

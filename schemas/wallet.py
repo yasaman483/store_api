@@ -11,7 +11,7 @@ class WalletCreate(WalletBase):
 
 
 class WalletResopnse(WalletBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, validate_assignment=True)
     wallet_balance: Decimal
 
 

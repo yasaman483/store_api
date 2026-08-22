@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from enum import Enum
 from decimal import Decimal
 from datetime import date
-from schemas.discount_people import DiscountPeopleUpdate
+from schemas.discount_granted import DiscountGrantedUpdate
 
 
 class DiscountType(str, Enum):
@@ -38,7 +38,7 @@ class DiscountUpdateSent(BaseModel):
     amount: Decimal | None = None
     expired_at: date | None = None
     active_for_all: bool | None = None
-    people: list[DiscountPeopleUpdate] | None = None
+    people: list[DiscountGrantedUpdate] | None = None
 
 
 class GetDiscountName(BaseModel):

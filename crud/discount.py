@@ -1,16 +1,32 @@
 from fastapi import HTTPException
 from schemas.discount import DiscountCreate, DiscountUpdateGet, DiscountUpdateSent, GetDiscountId, GetDiscountName
 from models.discount import Discount
-from models.people import People
+from models.people import Person
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from schemas.people import Roles
-from models.discount_people import DiscountPeople
-from schemas.discount_people import DiscountStatus
+from models.discount_granted import DiscountGranted
+from schemas.discount_granted import DiscountStatus
+from datetime import datetime, UTC
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-async def create_discount(discount: DiscountCreate, current_user: People, db: AsyncSession):
+async def create_discount(discount: DiscountCreate, current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Create discount failed",
+            "method": "POST",
+            "error": "Not authorized to create discount",
+            "path": "/discount/create_discount",
+            "user_id": current_user.user_id,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         raise HTTPException(
             status_code=403, detail='Not authorized for creating discount')
     try:
@@ -26,15 +42,15 @@ async def create_discount(discount: DiscountCreate, current_user: People, db: As
         await db.flush()
 
         if discount.active_for_all:
-            result = await db.execute(select(People).where(
-                People.role == Roles.CUSTOMER))
+            result = await db.execute(select(Person).where(
+                Person.role == Roles.CUSTOMER))
 
             all_people = result.scalars().all()
 
             for i in range(len(all_people)):
-                new_discount_people = DiscountPeople(
+                new_discount_people = DiscountGranted(
                     discount_id=new_discount.discount_id,
-                    people_id=all_people[i].people_id
+                    people_id=all_people[i].user_id
                 )
 
                 db.add(new_discount_people)
@@ -42,14 +58,14 @@ async def create_discount(discount: DiscountCreate, current_user: People, db: As
 
         elif discount.people:
             for i in range(len(discount.people)):
-                result = await db.execute(select(People).where(
-                    People.phone == discount.people[i]))
+                result = await db.execute(select(Person).where(
+                    Person.phone == discount.people[i]))
 
                 user = result.scalar_one_or_none()
 
-                new_discount_people = DiscountPeople(
+                new_discount_people = DiscountGranted(
                     discount_id=new_discount.discount_id,
-                    people_id=user.people_id
+                    people_id=user.user_id
                 )
 
                 db.add(new_discount_people)
@@ -57,15 +73,50 @@ async def create_discount(discount: DiscountCreate, current_user: People, db: As
 
         await db.commit()
         await db.refresh(new_discount)
+
+        end_time = datetime.now(UTC)
+        info = {
+            "event": "Create discount succeeded",
+            "method": "POST",
+            "path": "/discount/create_discount",
+            "user_id": current_user.user_id,
+            "discount_id": new_discount.discount_id,
+            "status_code": 200,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.info(info)
+
         return new_discount
 
     except Exception as ex:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Create discount failed",
+            "method": "POST",
+            "error": f"{ex}",
+            "path": "/discount/create_discount",
+            "user_id": current_user.user_id,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         await db.rollback()
         raise ex
 
 
-async def get_discounts(current_user: People, db: AsyncSession):
+async def get_discounts(current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Get discounts failed",
+            "method": "POST",
+            "error": "Not authorized to get discounts",
+            "path": "/discount/read_discounts",
+            "user_id": current_user.user_id,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         raise HTTPException(
             status_code=403, detail='Not authorized for getting discounts')
 
@@ -75,15 +126,38 @@ async def get_discounts(current_user: People, db: AsyncSession):
 
     if not discounts:
         raise HTTPException(
-            status_code=403, detail='There are not any discounts yet')
+            status_code=404, detail='There are not any discounts yet')
+
+    end_time = datetime.now(UTC)
+    info = {
+        "event": "Get discounts succeeded",
+        "method": "POST",
+        "path": "/discount/read_discounts",
+        "user_id": current_user.user_id,
+        "status_code": 200,
+        "duration": (end_time - start_time).total_seconds()
+    }
+    logger.info(info)
 
     return discounts
 
 
-async def get_discount_by_name(discount: GetDiscountName, current_user: People, db: AsyncSession):
+async def get_discount_by_name(discount: GetDiscountName, current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Get discount by name failed",
+            "method": "POST",
+            "error": "Not authorized to get discount by name",
+            "path": "/discount/read_discount_by_name",
+            "user_id": current_user.user_id,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         raise HTTPException(
-            status_code=403, detail='Not authorized for getting discounts')
+            status_code=403, detail='Not authorized for getting discount by name')
 
     result = await db.execute(select(Discount).where(Discount.discount_name == discount.discount_name))
 
@@ -93,13 +167,36 @@ async def get_discount_by_name(discount: GetDiscountName, current_user: People, 
         raise HTTPException(
             status_code=403, detail='There are not any discounts yet')
 
+    end_time = datetime.now(UTC)
+    info = {
+        "event": "Get discount by name succeeded",
+        "method": "POST",
+        "path": "/discount/read_discount_by_name",
+        "user_id": current_user.user_id,
+        "status_code": 200,
+        "duration": (end_time - start_time).total_seconds()
+    }
+    logger.info(info)
+
     return searched_discount
 
 
-async def get_discount_by_id(discount: GetDiscountId, current_user: People, db: AsyncSession):
+async def get_discount_by_id(discount: GetDiscountId, current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Get discount by id failed",
+            "method": "POST",
+            "error": "Not authorized to get discount by id",
+            "path": "/discount/read_discount_by_id",
+            "user_id": current_user.user_id,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         raise HTTPException(
-            status_code=403, detail='Not authorized for getting discounts')
+            status_code=403, detail='Not authorized for getting discount by id')
 
     result = await db.execute(select(Discount).where(Discount.discount_id == discount.discount_id))
 
@@ -107,13 +204,37 @@ async def get_discount_by_id(discount: GetDiscountId, current_user: People, db: 
 
     if searched_discount is None:
         raise HTTPException(
-            status_code=403, detail='There are not any discounts yet')
+            status_code=403, detail=f'Discount {discount.discount_id} not found')
+
+    end_time = datetime.now(UTC)
+    info = {
+        "event": "Get discount by id succeeded",
+        "method": "POST",
+        "path": "/discount/read_discount_by_id",
+        "user_id": current_user.user_id,
+        "status_code": 200,
+        "duration": (end_time - start_time).total_seconds()
+    }
+    logger.info(info)
 
     return searched_discount
 
 
-async def update_discount(current_discount: DiscountUpdateGet, new_discount: DiscountUpdateSent, current_user: People, db: AsyncSession):
+async def update_discount(current_discount: DiscountUpdateGet, new_discount: DiscountUpdateSent, current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Update discount failed",
+            "method": "POST",
+            "error": "Not authorized to update discount",
+            "path": "/discount/update_discount",
+            "user_id": current_user.user_id,
+            "discount_name": current_discount.discount_name,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         raise HTTPException(
             status_code=403, detail='Not authorized for updating discount')
     try:
@@ -132,8 +253,8 @@ async def update_discount(current_discount: DiscountUpdateGet, new_discount: Dis
             people = update_data.pop("people")
 
             for i in range(len(people)):
-                result = await db.execute(select(People).where(
-                    People.phone == people[i]["phone"]))
+                result = await db.execute(select(Person).where(
+                    Person.phone == people[i]["phone"]))
 
                 user = result.scalar_one_or_none()
 
@@ -141,16 +262,16 @@ async def update_discount(current_discount: DiscountUpdateGet, new_discount: Dis
                     raise HTTPException(
                         status_code=404, detail=f'Person with phone {people[i]["phone"]} not found.')
 
-                result = await db.execute(select(DiscountPeople).where(
-                    DiscountPeople.people_id == user.people_id, DiscountPeople.discount_id == discount.discount_id))
+                result = await db.execute(select(DiscountGranted).where(
+                    DiscountGranted.people_id == user.user_id, DiscountGranted.discount_id == discount.discount_id))
 
                 discount_person = result.scalar_one_or_none()
 
                 if people[i]["status"] == DiscountStatus.ACTIVE:
                     if discount_person is None:
-                        new_discount_people = DiscountPeople(
+                        new_discount_people = DiscountGranted(
                             discount_id=discount.discount_id,
-                            people_id=user.people_id
+                            people_id=user.user_id
                         )
 
                         db.add(new_discount_people)
@@ -166,19 +287,54 @@ async def update_discount(current_discount: DiscountUpdateGet, new_discount: Dis
         for key, value in update_data.items():
             setattr(discount, key, value)
 
+        end_time = datetime.now(UTC)
+        info = {
+            "event": "Update discount succeeded",
+            "method": "POST",
+            "path": "/discount/update_discount",
+            "user_id": current_user.user_id,
+            "discount_id": discount.discount_id,
+            "status_code": 200,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.info(info)
+
         await db.commit()
         await db.refresh(discount)
         return discount
 
     except Exception as ex:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Update discount failed",
+            "method": "POST",
+            "error": f"{ex}",
+            "path": "/discount/update_discount",
+            "user_id": current_user.user_id,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         await db.rollback()
         raise ex
 
 
-async def delete_discount(discount: DiscountUpdateGet, current_user: People, db: AsyncSession):
+async def delete_discount(discount: DiscountUpdateGet, current_user: Person, db: AsyncSession):
+    start_time = datetime.now(UTC)
     if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Delete discount failed",
+            "method": "POST",
+            "error": "Not authorized to delete discount",
+            "path": "/discount/delete_discount",
+            "user_id": current_user.user_id,
+            "discount_name": discount.discount_name,
+            "status_code": 403,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         raise HTTPException(
-            status_code=403, detail='Not authorized for creating discount')
+            status_code=403, detail='Not authorized for deleting discount')
     try:
         result = await db.execute(select(Discount).where(
             Discount.discount_name == discount.discount_name))
@@ -191,8 +347,31 @@ async def delete_discount(discount: DiscountUpdateGet, current_user: People, db:
 
         await db.delete(searched_discount)
         await db.commit()
+
+        end_time = datetime.now(UTC)
+        info = {
+            "event": "Delete discount succeeded",
+            "method": "POST",
+            "path": "/discount/delete_discount",
+            "user_id": current_user.user_id,
+            "discount_name": discount.discount_name,
+            "status_code": 200,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.info(info)
+
         return {f'{searched_discount.discount_name} deleted successfully'}
 
     except Exception as ex:
+        end_time = datetime.now(UTC)
+        error = {
+            "event": "Delete discount failed",
+            "method": "POST",
+            "error": f"{ex}",
+            "path": "/discount/delete_discount",
+            "user_id": current_user.user_id,
+            "duration": (end_time - start_time).total_seconds()
+        }
+        logger.error(error)
         await db.rollback()
         raise ex

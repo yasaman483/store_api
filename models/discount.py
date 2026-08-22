@@ -7,7 +7,7 @@ from datetime import date
 
 
 class Discount(Base):
-    __tablename__ = 'discount'
+    __tablename__ = 'discounts'
 
     discount_id: Mapped[int] = mapped_column(
         Integer, autoincrement=True, nullable=False, primary_key=True)
@@ -18,5 +18,5 @@ class Discount(Base):
     expired_at: Mapped[date] = mapped_column(Date, nullable=False)
     active_for_all: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
-    discount_people = relationship(
-        "DiscountPeople", back_populates="discount", cascade="all, delete-orphan")
+    discount_granted = relationship(
+        "DiscountGranted", back_populates="discount", cascade="all, delete-orphan")

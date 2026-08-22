@@ -8,23 +8,23 @@ class DiscountStatus(str, Enum):
     DEACTIVE = "deactive"
 
 
-class DiscountPeopleBase(BaseModel):
+class DiscountGrantedBase(BaseModel):
     used: bool
     used_at: date | None = None
     discount_id: int
     people_id: int
 
 
-class DiscountPeopleCreate(DiscountPeopleBase):
+class DiscountGrantedCreate(DiscountGrantedBase):
     pass
 
 
-class DiscountPeopleUpdate(BaseModel):
+class DiscountGrantedUpdate(BaseModel):
     phone: str
     status: DiscountStatus
 
 
-class DiscountPeopleResponse(DiscountPeopleBase):
+class DiscountGrantedResponse(DiscountGrantedBase):
     model_config = ConfigDict(from_attributes=True)
 
     order_id: int | None

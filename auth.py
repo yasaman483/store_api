@@ -7,8 +7,10 @@ from fastapi import Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.connect import get_db
-from models import People
+from models.people import Person
+import logging
 
+logger = logging.getLogger(__name__)
 
 password_hash = PasswordHash.recommended()
 security = HTTPBearer(auto_error=False)
@@ -47,11 +49,19 @@ def verify_access_token(token: str):
             algorithms=[setting.algorithm],
             options={"require": ["exp", "sub"]}
         )
-    except jwt.InvalidTokenError:
+
+    except jwt.InvalidTokenError as ex:
+        error = {
+            "event": "There are something wrong on the token {token}", "error": ex}
+        logger.error(error)
         return None
-    except Exception as e:
-        print(e)
+
+    except Exception as ex:
+        error = {
+            "event": "There are some errors in between of verifying access token", "error": ex}
+        logger.error(error)
         return None
+
     else:
         return payload.get("sub")
 
@@ -64,15 +74,20 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
     user_id = verify_access_token(token)
 
     if user_id is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=401, detail="Invalid or expired token.")
 
     try:
         user_id_int = int(user_id)
-    except Exception as e:
-        raise HTTPException(
-            status_code=401, detail=f"Invalid or expired token based on error {e}")
+    except Exception as ex:
+        error = {"event": "Some error occured during getting current user for validation",
+                 "error": ex, "user_id": user_id_int}
+        logger.error(error)
 
-    result = await db.execute(select(People).where(People.people_id == user_id_int))
+        raise HTTPException(
+            status_code=401, detail=f"Invalid or expired token.")
+
+    result = await db.execute(select(Person).where(Person.user_id == user_id_int))
 
     user = result.scalar_one_or_none()
 

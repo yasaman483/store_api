@@ -671,3 +671,166 @@ RuntimeError: greenlet is being finalized
 2026-08-16 01:46:03,455 - INFO - connection done successfully.
 2026-08-16 05:13:36,326 - INFO - connection done successfully.
 2026-08-16 12:35:15,310 - INFO - connection done successfully.
+2026-08-22 02:10:23,780 - ERROR - {'event': 'Connection could not be made', 'error': "Foreign key associated with column 'discount_granted.discount_id' could not find table 'discount' with which to generate a foreign key to target column 'discount_id'"}
+2026-08-22 02:12:31,012 - ERROR - {'event': 'Connection could not be made', 'error': "Could not initialize target column for ForeignKey 'people.people_id' on table 'discount_granted': table 'people' has no column named 'people_id'"}
+2026-08-22 02:13:03,398 - ERROR - {'event': 'Connection could not be made', 'error': "Could not initialize target column for ForeignKey 'people.people_id' on table 'employees_info': table 'people' has no column named 'people_id'"}
+2026-08-22 02:13:14,141 - ERROR - {'event': 'Connection could not be made', 'error': "Could not initialize target column for ForeignKey 'people.people_id' on table 'wallets': table 'people' has no column named 'people_id'"}
+2026-08-22 02:13:25,728 - ERROR - {'event': 'Connection could not be made', 'error': '(pymysql.err.OperationalError) (3734, "Failed to add the foreign key constraint. Missing column \'user_id\' for constraint \'employees_info_ibfk_1\' in the referenced table \'people\'")\n[SQL: \nCREATE TABLE employees_info (\n\temployee_id INTEGER NOT NULL, \n\tjob_title VARCHAR(50) NOT NULL, \n\tsalary DECIMAL(10, 2) NOT NULL, \n\temployee_status ENUM(\'ACTIVE\',\'UNACTIVE\') NOT NULL, \n\tPRIMARY KEY (employee_id), \n\tFOREIGN KEY(employee_id) REFERENCES people (user_id) ON DELETE cascade\n)\n\n]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)'}
+2026-08-22 02:14:26,033 - ERROR - {'event': 'Connection could not be made', 'error': "Could not initialize target column for ForeignKey 'people.people_id' on table 'orders': table 'people' has no column named 'people_id'"}
+2026-08-22 02:14:38,580 - ERROR - {'event': 'Connection could not be made', 'error': '(pymysql.err.OperationalError) (1830, "Column \'category_id\' cannot be NOT NULL: needed in a foreign key constraint \'products_ibfk_1\' SET NULL")\n[SQL: \nCREATE TABLE products (\n\tproduct_id INTEGER NOT NULL AUTO_INCREMENT, \n\tproduct_name VARCHAR(50) NOT NULL, \n\tunit_price DECIMAL(10, 2) NOT NULL, \n\tremain_in_stock INTEGER NOT NULL, \n\tcategory_id INTEGER NOT NULL, \n\tPRIMARY KEY (product_id), \n\tUNIQUE (product_name), \n\tFOREIGN KEY(category_id) REFERENCES categories (category_id) ON DELETE SET NULL\n)\n\n]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)'}
+2026-08-22 02:15:07,108 - ERROR - {'event': 'Connection could not be made', 'error': '(pymysql.err.OperationalError) (1830, "Column \'category_id\' cannot be NOT NULL: needed in a foreign key constraint \'products_ibfk_1\' SET NULL")\n[SQL: \nCREATE TABLE products (\n\tproduct_id INTEGER NOT NULL AUTO_INCREMENT, \n\tproduct_name VARCHAR(50) NOT NULL, \n\tunit_price DECIMAL(10, 2) NOT NULL, \n\tremain_in_stock INTEGER NOT NULL, \n\tcategory_id INTEGER NOT NULL, \n\tPRIMARY KEY (product_id), \n\tUNIQUE (product_name), \n\tFOREIGN KEY(category_id) REFERENCES categories (category_id) ON DELETE SET NULL\n)\n\n]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)'}
+2026-08-22 02:16:29,420 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Wallet(wallets)]' has no property 'person'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:17:34,005 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Wallet(wallets)]' has no property 'person'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:18:12,885 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Wallet(wallets)]' has no property 'person'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:19:05,762 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Discount(discounts)]' has no property 'discounts'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:20:01,984 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Discount(discounts)]' has no property 'discount'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:20:15,475 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Discount(discounts)]' has no property 'discount'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:21:33,800 - ERROR - {'event': 'Connection could not be made', 'error': "Mapper 'Mapper[Person(people)]' has no property 'discount_people'.  If this property was indicated from other mappers or configure events, ensure registry.configure() has been called."}
+2026-08-22 02:22:18,567 - ERROR - {'event': 'Connection could not be made', 'error': "When initializing mapper Mapper[OrderItems(order_items)], expression 'Orders' failed to locate a name ('Orders'). If this is a class name, consider adding this relationship() to the <class 'models.order_items.OrderItems'> class after both dependent classes have been defined."}
+2026-08-22 02:23:39,595 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:23:42,594 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:24:14,597 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:26:07,040 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:26:08,721 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:26:23,403 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:26:25,031 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:26:46,035 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:26:48,173 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:26:52,955 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 200, 'duration_s': 0.10542}
+2026-08-22 02:27:17,384 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:27:42,658 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:28:11,187 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 200, 'duration_s': 0.112178}
+2026-08-22 02:29:26,293 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:29:28,124 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:29:30,885 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 200, 'duration_s': 0.097396}
+2026-08-22 02:31:02,811 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:31:04,603 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:31:04,707 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:31:06,490 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:31:06,605 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:31:08,351 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:31:21,985 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:32:48,763 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:47:35,653 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 200, 'duration_s': 0.105525}
+2026-08-22 02:48:10,793 - ERROR - {'event': 'Current user info sendt successfully', 'method': 'POST', 'path': '/people/me', 'user_id': 1, 'status_code': 200, 'duration_s': 0.0}
+2026-08-22 02:48:18,705 - INFO - {'event': 'All people info sent successfully', 'method': 'POST', 'psth': '/people/get_all_people_info', 'user_id': 1, 'status_code': 200, 'duration_s': 0.001506}
+2026-08-22 02:48:19,652 - INFO - {'event': 'All people info sent successfully', 'method': 'POST', 'psth': '/people/get_all_people_info', 'user_id': 1, 'status_code': 200, 'duration_s': 0.0}
+2026-08-22 02:48:41,665 - INFO - {'event': 'Person info sent successfully', 'method': 'POST', 'psth': '/people/get_person_info_by_id', 'user_id': 1, 'status_code': 200, 'duration_s': 0.001}
+2026-08-22 02:50:06,037 - ERROR - {'event': 'Update person info failed', 'method': 'POST', 'error': '403: Report To is not an info for all users except employees', 'path': '/people/edit_info', 'user_id': 1, 'duration': 0.001}
+2026-08-22 02:50:17,183 - INFO - {'event': 'Update person info succeeded', 'method': 'POST', 'path': '/people/edit_info', 'updater_user_id': 1, 'updated_user_id': 1, 'status_code': 200, 'duration': 0.128416}
+2026-08-22 02:50:36,320 - INFO - {'event': 'Update person info succeeded', 'method': 'POST', 'path': '/people/edit_info', 'updater_user_id': 1, 'updated_user_id': 1, 'status_code': 200, 'duration': 0.110456}
+2026-08-22 02:51:35,542 - INFO - {'event': "New user didn't add successfully", 'error': HTTPException(status_code=403, detail='Not authorized to add employee'), 'methood': 'POST', 'path': '/people/sign_up', 'duration_s': 0.0}
+2026-08-22 02:51:43,715 - INFO - {'event': 'New customer added successfully', 'methood': 'POST', 'path': '/people/sign_up', 'added_user_id': 2, 'added_wallet_id': 1, 'status_code': 200, 'duration_s': 0.112084}
+2026-08-22 02:52:37,441 - INFO - {'event': 'All people info sent successfully', 'method': 'POST', 'psth': '/people/get_all_people_info', 'user_id': 1, 'status_code': 200, 'duration_s': 0.003484}
+2026-08-22 02:52:55,169 - INFO - {'event': 'New employee added successfully', 'methood': 'POST', 'path': '/people/sign_up', 'manager_id': 1, 'added_user_id': 3, 'status_code': 200, 'duration_s': 0.103312}
+2026-08-22 02:53:02,051 - INFO - {'event': 'All people info sent successfully', 'method': 'POST', 'psth': '/people/get_all_people_info', 'user_id': 1, 'status_code': 200, 'duration_s': 0.001579}
+2026-08-22 02:57:42,624 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:57:44,981 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 02:58:47,895 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 02:58:49,631 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:03:36,435 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:03:38,169 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:03:49,433 - INFO - {'event': 'Delete person info succeeded', 'method': 'POST', 'path': '/people/delete_person_info', 'deleter_user_id': 1, 'deleted_user_id': 3, 'status_code': 200, 'duration': 0.038666}
+2026-08-22 03:05:05,774 - INFO - {'event': 'New employee added successfully', 'methood': 'POST', 'path': '/people/sign_up', 'manager_id': 1, 'added_user_id': 4, 'status_code': 200, 'duration_s': 0.1134}
+2026-08-22 03:06:03,664 - INFO - {'event': 'New employee added successfully', 'methood': 'POST', 'path': '/people/sign_up', 'manager_id': 1, 'added_user_id': 5, 'status_code': 200, 'duration_s': 0.105913}
+2026-08-22 03:06:35,436 - INFO - {'event': "New user didn't add successfully", 'error': HTTPException(status_code=403, detail='Not authorized to add employee'), 'methood': 'POST', 'path': '/people/sign_up', 'duration_s': 0.0}
+2026-08-22 03:06:46,475 - INFO - {'event': 'New customer added successfully', 'methood': 'POST', 'path': '/people/sign_up', 'added_user_id': 6, 'added_wallet_id': 2, 'status_code': 200, 'duration_s': 0.140561}
+2026-08-22 03:07:04,181 - INFO - {'event': "New user didn't add successfully", 'error': IntegrityError('(pymysql.err.IntegrityError) (1062, "Duplicate entry \'09382584362\' for key \'people.phone\'")'), 'methood': 'POST', 'path': '/people/sign_up', 'duration_s': 0.113021}
+2026-08-22 03:07:42,316 - INFO - {'event': "New user didn't add successfully", 'error': IntegrityError('(pymysql.err.IntegrityError) (1062, "Duplicate entry \'09382584362\' for key \'people.phone\'")'), 'methood': 'POST', 'path': '/people/sign_up', 'duration_s': 0.116694}
+2026-08-22 03:07:48,645 - INFO - {'event': 'New customer added successfully', 'methood': 'POST', 'path': '/people/sign_up', 'added_user_id': 9, 'added_wallet_id': 3, 'status_code': 200, 'duration_s': 0.100299}
+2026-08-22 03:09:10,219 - INFO - {'event': "Get all employess' info succeeded", 'method': 'POST', 'path': '/employees_info/get_employees', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:09:24,644 - INFO - {'event': 'Get employee info by id succeeded', 'method': 'POST', 'path': '/employees_info/get_employee_by_id', 'employee_id': 4, 'user_id': 1, 'status_code': 200, 'duration': 0.001518}
+2026-08-22 03:10:09,365 - INFO - {'event': 'Update employee info by id succeeded', 'method': 'POST', 'path': '/employees_info/update_employee_info', 'employee_id': 5, 'user_id': 1, 'status_code': 200, 'duration': 0.028304}
+2026-08-22 03:10:48,461 - INFO - {'event': 'Create category succeeded', 'method': 'POST', 'path': '/categories/add_category', 'user_id': 1, 'added_category': 1, 'status_code': 200, 'duration': 0.007482}
+2026-08-22 03:11:01,787 - INFO - {'event': 'Create category succeeded', 'method': 'POST', 'path': '/categories/add_category', 'user_id': 1, 'added_category': 2, 'status_code': 200, 'duration': 0.011034}
+2026-08-22 03:11:07,820 - INFO - {'event': 'Create category succeeded', 'method': 'POST', 'path': '/categories/add_category', 'user_id': 1, 'added_category': 3, 'status_code': 200, 'duration': 0.023232}
+2026-08-22 03:11:14,674 - INFO - {'event': 'Get all categories succeeded', 'method': 'POST', 'path': '/categories/get_categories', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:11:25,458 - INFO - {'event': 'Get category by id succeeded', 'method': 'POST', 'path': '/categories/get_category', 'user_id': 1, 'category_id': 2, 'status_code': 200, 'duration': 0.001516}
+2026-08-22 03:14:41,784 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:14:44,040 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:14:47,273 - ERROR - {'event': 'Update category by id failed', 'method': 'POST', 'error': '404: Category 2 not found.', 'path': '/categories/update_category', 'user_id': 1, 'category_id': 2, 'duration': 0.00398}
+2026-08-22 03:15:12,299 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:15:14,530 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:15:26,966 - INFO - {'event': 'Update category by id succeeded', 'method': 'POST', 'path': '/categories/update_category', 'user_id': 1, 'category_id': 2, 'status_code': 200, 'duration': 0.038858}
+2026-08-22 03:15:32,080 - INFO - {'event': 'Get all categories succeeded', 'method': 'POST', 'path': '/categories/get_categories', 'user_id': 1, 'status_code': 200, 'duration': 0.004061}
+2026-08-22 03:15:43,098 - INFO - {'event': 'Create category succeeded', 'method': 'POST', 'path': '/categories/add_category', 'user_id': 1, 'added_category': 4, 'status_code': 200, 'duration': 0.027204}
+2026-08-22 03:15:57,872 - ERROR - {'event': 'Delete category by id failed', 'method': 'POST', 'error': '404: Category 4 not found.', 'path': '/categories/delete_category', 'user_id': 1, 'category_id': 4, 'duration': 0.001996}
+2026-08-22 03:16:10,391 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:16:12,206 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:22:20,817 - ERROR - {'event': 'There are something wrong on the token {token}', 'error': ExpiredSignatureError('Signature has expired')}
+2026-08-22 03:22:51,644 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:22:53,872 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:23:11,222 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:23:12,927 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:23:37,146 - ERROR - {'event': 'There are something wrong on the token {token}', 'error': ExpiredSignatureError('Signature has expired')}
+2026-08-22 03:26:04,835 - ERROR - {'event': 'Login failed', 'method': 'POST', 'error': 'User not found or verification failed', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 404, 'duration_s': 0.004009}
+2026-08-22 03:26:21,092 - ERROR - {'event': 'Login failed', 'method': 'POST', 'error': 'User not found or verification failed', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 404, 'duration_s': 0.002}
+2026-08-22 03:26:45,659 - ERROR - {'event': 'Login failed', 'method': 'POST', 'error': 'User not found or verification failed', 'path': '/people/login', 'user_phone': '09000000000', 'status_code': 404, 'duration_s': 0.0}
+2026-08-22 03:27:03,452 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09131234567', 'status_code': 200, 'duration_s': 0.109519}
+2026-08-22 03:27:29,973 - INFO - {'event': 'Get all categories succeeded', 'method': 'POST', 'path': '/categories/get_categories', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:27:38,711 - INFO - {'event': 'Delete category by id succeeded', 'method': 'POST', 'path': '/categories/delete_category', 'user_id': 1, 'deleted_category': 4, 'status_code': 200, 'duration': 0.040121}
+2026-08-22 03:28:16,622 - INFO - {'event': 'Create discount succeeded', 'method': 'POST', 'path': '/discount/create_discount', 'user_id': 1, 'discount_id': 1, 'status_code': 200, 'duration': 0.019177}
+2026-08-22 03:30:54,268 - INFO - {'event': 'Create discount succeeded', 'method': 'POST', 'path': '/discount/create_discount', 'user_id': 1, 'discount_id': 3, 'status_code': 200, 'duration': 0.02339}
+2026-08-22 03:31:03,385 - INFO - {'event': 'Get discounts succeeded', 'method': 'POST', 'path': '/discount/read_discounts', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:32:37,545 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:32:39,906 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:32:47,093 - INFO - {'event': 'Get discount by name succeeded', 'method': 'POST', 'path': '/discount/read_discount_by_name', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:34:38,065 - INFO - {'event': 'Get discounts succeeded', 'method': 'POST', 'path': '/discount/read_discounts', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:35:08,355 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:35:10,380 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:35:16,658 - INFO - {'event': 'Get discount by id succeeded', 'method': 'POST', 'path': '/discount/read_discount_by_id', 'user_id': 1, 'status_code': 200, 'duration': 0.000998}
+2026-08-22 03:36:38,163 - INFO - {'event': 'Update discount succeeded', 'method': 'POST', 'path': '/discount/update_discount', 'user_id': 1, 'discount_id': 1, 'status_code': 200, 'duration': 0.001995}
+2026-08-22 03:36:55,428 - INFO - {'event': 'Create discount succeeded', 'method': 'POST', 'path': '/discount/create_discount', 'user_id': 1, 'discount_id': 4, 'status_code': 200, 'duration': 0.029127}
+2026-08-22 03:39:48,741 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:39:50,425 - ERROR - {'event': 'Connection could not be made', 'error': 'For many-to-one relationship DiscountGranted.discount, delete-orphan cascade is normally configured only on the "one" side of a one-to-many relationship, and not on the "many" side of a many-to-one or many-to-many relationship.  To force this relationship to allow a particular "Discount" object to be referenced by only a single "DiscountGranted" object at a time via the DiscountGranted.discount relationship, which would allow delete-orphan cascade to take place in this direction, set the single_parent=True flag. (Background on this error at: https://sqlalche.me/e/20/bbf0)'}
+2026-08-22 03:40:01,635 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:40:40,735 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:40:42,279 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:41:57,278 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 03:41:59,019 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 03:42:03,414 - INFO - {'event': 'Delete discount succeeded', 'method': 'POST', 'path': '/discount/delete_discount', 'user_id': 1, 'discount_name': 'string', 'status_code': 200, 'duration': 0.033423}
+2026-08-22 03:42:36,507 - INFO - {'event': 'Get granted discounts by discount name succeeded', 'method': 'POST', 'path': '/discount_granted/get_people_by_discount_name', 'user_id': 1, 'discount_name': 'Freedom', 'status_code': 200, 'duration': 0.004001}
+2026-08-22 03:42:45,562 - INFO - {'event': 'Get granted discounts by discount name succeeded', 'method': 'POST', 'path': '/discount_granted/get_people_by_discount_name', 'user_id': 1, 'discount_name': 'Special', 'status_code': 200, 'duration': 0.002009}
+2026-08-22 03:43:04,822 - INFO - {'event': 'Get granted discounts by discount id succeeded', 'method': 'POST', 'path': '/discount_granted/get_people_by_discount_id', 'user_id': 1, 'discount_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:43:10,387 - INFO - {'event': 'Get granted discounts by discount id succeeded', 'method': 'POST', 'path': '/discount_granted/get_people_by_discount_id', 'user_id': 1, 'discount_id': 3, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:46:16,554 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09650557395', 'status_code': 200, 'duration_s': 0.111924}
+2026-08-22 03:46:45,119 - INFO - {'event': 'Remain wallet amount sent successfully', 'method': 'POST', 'path': '/Wallet/get_remain_wallet_amount', 'user_id': 2, 'status_code': 200, 'duration_s': 0.011914}
+2026-08-22 03:47:15,035 - INFO - {'event': 'Amount added successfully', 'path': '/Wallet/update_wallet_amount', 'user_id': 2, 'status_code': 200, 'duration_s': 0.034751}
+2026-08-22 03:47:22,088 - INFO - {'event': 'Amount added successfully', 'path': '/Wallet/update_wallet_amount', 'user_id': 2, 'status_code': 200, 'duration_s': 0.016392}
+2026-08-22 03:47:28,325 - INFO - {'event': 'Remain wallet amount sent successfully', 'method': 'POST', 'path': '/Wallet/get_remain_wallet_amount', 'user_id': 2, 'status_code': 200, 'duration_s': 0.001028}
+2026-08-22 03:48:02,481 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09131234567', 'status_code': 200, 'duration_s': 0.100821}
+2026-08-22 03:49:00,573 - INFO - {'event': 'Create poduct succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 1, 'added_category': 1, 'status_code': 200, 'duration': 0.1081}
+2026-08-22 03:49:30,283 - INFO - {'event': 'Update product succeeded', 'method': 'POST', 'path': '/products/update_product', 'user_id': 1, 'product_id': 1, 'status_code': 200, 'duration': 0.008038}
+2026-08-22 03:50:29,462 - INFO - {'event': 'Create poduct succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 1, 'added_category': 2, 'status_code': 200, 'duration': 0.02463}
+2026-08-22 03:51:02,539 - INFO - {'event': 'Create poduct succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 1, 'added_category': 3, 'status_code': 200, 'duration': 0.006}
+2026-08-22 03:51:07,805 - INFO - {'event': 'Get all poducts succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 1, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:51:25,181 - INFO - {'event': 'Get poduct by name succeeded', 'method': 'POST', 'path': '/products/get_product_by_name', 'user_id': 1, 'product_name': "women's top", 'status_code': 200, 'duration': 0.001004}
+2026-08-22 03:51:45,185 - INFO - {'event': 'Get poduct by id succeeded', 'method': 'POST', 'path': '/products/get_product_by_id', 'user_id': 1, 'product_id': 2, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:52:01,152 - ERROR - {'event': 'Create product failed', 'method': 'POST', 'error': '404: Category not found', 'path': '/products/add_product', 'user_id': 1, 'duration': 0.001598}
+2026-08-22 03:52:10,367 - INFO - {'event': 'Create poduct succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 1, 'added_category': 4, 'status_code': 200, 'duration': 0.02595}
+2026-08-22 03:52:20,644 - INFO - {'event': 'Delete product succeeded', 'method': 'POST', 'path': '/products/update_product', 'user_id': 1, 'product_id': 4, 'status_code': 200, 'duration': 0.000998}
+2026-08-22 03:52:26,611 - INFO - {'event': 'Get all poducts succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 1, 'status_code': 200, 'duration': 0.000587}
+2026-08-22 03:53:52,843 - ERROR - {'event': 'Login succeeded', 'method': 'POST', 'path': '/people/login', 'user_phone': '09650557395', 'status_code': 200, 'duration_s': 0.081938}
+2026-08-22 03:55:02,583 - INFO - {'event': 'Add order succeeded', 'method': 'POST', 'path': '/orders/add_order', 'user_id': 2, 'added_order': 1, 'status_code': 200, 'duration': 0.023232}
+2026-08-22 03:55:18,424 - INFO - {'event': 'Add order succeeded', 'method': 'POST', 'path': '/orders/add_order', 'user_id': 2, 'added_order': 2, 'status_code': 200, 'duration': 0.023313}
+2026-08-22 03:56:04,285 - INFO - {'event': "Get all cucstomer's orders succeeded", 'method': 'POST', 'path': '/orders/get_all_orders', 'user_id': 2, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:56:14,200 - INFO - {'event': "Get customer's order by id succeeded", 'method': 'POST', 'path': '/orders/get_order_by_id', 'user_id': 2, 'status_code': 200, 'duration': 0.001543}
+2026-08-22 03:57:20,632 - INFO - {'event': 'Update order items succeeded', 'method': 'POST', 'path': '/order_items/update_order_item', 'user_id': 2, 'order_id': 1, 'status_code': 200, 'duration': 0.017812}
+2026-08-22 03:57:28,629 - INFO - {'event': "Get all cucstomer's orders succeeded", 'method': 'POST', 'path': '/orders/get_all_orders', 'user_id': 2, 'status_code': 200, 'duration': 0.000526}
+2026-08-22 03:57:42,446 - INFO - {'event': 'Get all poducts succeeded', 'method': 'POST', 'path': '/products/add_product', 'user_id': 2, 'status_code': 200, 'duration': 0.0}
+2026-08-22 03:58:10,482 - INFO - {'event': 'Amount deducted successfully', 'method': 'POST', 'path': '/Orders/add_order', 'user_id': 2, 'status_code': 200, 'duration_s': 0.0}
+2026-08-22 03:58:24,513 - INFO - {'event': 'Remain wallet amount sent successfully', 'method': 'POST', 'path': '/Wallet/get_remain_wallet_amount', 'user_id': 2, 'status_code': 200, 'duration_s': 0.0}
+2026-08-22 04:02:04,790 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 04:02:06,575 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 04:03:49,385 - INFO - {'event': 'The database shutdown successfully'}
+2026-08-22 04:03:51,422 - INFO - {'event': 'Connection done successfully'}
+2026-08-22 04:03:55,271 - INFO - {'event': 'Delete order succeeded', 'method': 'POST', 'path': '/orders/delete_order', 'user_id': 2, 'status_code': 200, 'duration': 0.047218}
+2026-08-22 04:04:05,144 - ERROR - {'event': 'Get payment histories failed', 'method': 'POST', 'error': 'Not authorized to get payment histories', 'path': '/payment_history/read_payment_histories', 'user_id': 2, 'status_code': 403, 'duration': 0.0}
+2026-08-22 04:04:05,144 - INFO - {'event': 'Get payment histories succeeded', 'method': 'POST', 'path': '/payment_history/read_payment_histories', 'user_id': 2, 'status_code': 200, 'duration': 0.0}
+2026-08-22 04:04:17,763 - ERROR - {'event': 'Get payment history by id failed', 'method': 'POST', 'error': 'Not authorized to get payment history', 'path': '/payment_history/read_payment_history_by_id', 'user_id': 2, 'payment_history': 1, 'status_code': 403, 'duration': 0.0}
+2026-08-22 04:04:33,632 - INFO - {'event': 'Get order items succeeded', 'method': 'POST', 'path': '/order_items/get_order_item', 'user_id': 2, 'order_id': 1, 'status_code': 200, 'duration': 0.003416}
+2026-08-22 04:05:54,830 - INFO - {'event': 'Add order succeeded', 'method': 'POST', 'path': '/orders/add_order', 'user_id': 2, 'added_order': 3, 'status_code': 200, 'duration': 0.031342}
+2026-08-22 04:06:09,247 - INFO - {'event': "Get all cucstomer's orders succeeded", 'method': 'POST', 'path': '/orders/get_all_orders', 'user_id': 2, 'status_code': 200, 'duration': 0.0}
+2026-08-22 04:06:34,799 - INFO - {'event': "Get all cucstomer's orders succeeded", 'method': 'POST', 'path': '/orders/get_all_orders', 'user_id': 2, 'status_code': 200, 'duration': 0.0}
+2026-08-22 04:06:50,797 - INFO - {'event': 'Get order items succeeded', 'method': 'POST', 'path': '/order_items/get_order_item', 'user_id': 2, 'order_id': 3, 'status_code': 200, 'duration': 0.002001}
+2026-08-22 04:07:07,964 - INFO - {'event': 'The database shutdown successfully'}

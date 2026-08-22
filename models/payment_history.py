@@ -1,5 +1,5 @@
 from sqlalchemy import Integer, DECIMAL, Date, ForeignKey, Enum as SQLEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database.connect import Base
 from decimal import Decimal
 from datetime import date
@@ -18,3 +18,6 @@ class PaymentHistory(Base):
         DECIMAL(10, 2), nullable=False)
     payment_date: Mapped[date] = mapped_column(
         Date, nullable=True)
+
+    order = relationship(
+        "Order", back_populates="payment_history")

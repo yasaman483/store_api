@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from database import connect
 import logging
 from contextlib import asynccontextmanager
-from routers import people, report_to, categories, products, discount, discount_people, wallet, orders, order_items, payment_history
+from routers import discount_granted, employee_info, people, categories, products, discount, wallet, orders, order_items, payment_history
 from seed import seed_manager
+
 
 logging.basicConfig(filename='./logs.log',
                     level=logging.INFO,
@@ -18,25 +19,29 @@ async def lifespan(app: FastAPI):
 
         await seed_manager()
 
-        logging.info('connection done successfully.')
+        info = {"event": "Connection done successfully"}
+        logging.info(info)
 
     except Exception as ex:
-        logging.error(f'connection could not be made due to the error: {ex}')
+        error = {"event": f'Connection could not be made', "error": f'{ex}'}
+        logging.error(error)
         raise ex
 
     yield
 
+    info = {"event": "The database shutdown successfully"}
+    logging.info(info)
     await connect.engine.dispose()
 
 
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(people.router)
-app.include_router(report_to.router)
+app.include_router(employee_info.router)
 app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(discount.router)
-app.include_router(discount_people.router)
+app.include_router(discount_granted.router)
 app.include_router(wallet.router)
 app.include_router(orders.router)
 app.include_router(order_items.router)

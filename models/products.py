@@ -4,7 +4,7 @@ from database.connect import Base
 from decimal import Decimal
 
 
-class Products(Base):
+class Product(Base):
     __tablename__ = "products"
 
     product_id: Mapped[int] = mapped_column(
@@ -14,7 +14,9 @@ class Products(Base):
     unit_price: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False)
     remain_in_stock: Mapped[int] = mapped_column(Integer, nullable=False)
     category_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("categories.category_id", ondelete='cascade'), nullable=False)
+        Integer, ForeignKey("categories.category_id", ondelete="cascade"), nullable=False)
 
     product_category = relationship(
-        "Categories", back_populates='products')
+        "Category", back_populates='products')
+    order_items = relationship(
+        "OrderItems", back_populates="products")
