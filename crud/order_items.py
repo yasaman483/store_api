@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.inspection import inspect
 from models.people import Person
 from models.order_items import OrderItems
 from models.orders import Order
@@ -12,97 +13,62 @@ from models.discount_granted import DiscountGranted
 from schemas.discount import DiscountType
 from decimal import Decimal
 from models.payment_history import PaymentHistory
-from datetime import datetime, UTC
 import logging
+from crud.audit_log import create_audit_log
+from schemas.audit import AuditContext
+from schemas.people import Roles
 
 logger = logging.getLogger(__name__)
 
 
-async def get_order_items(order: OrderUpdateById, current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    result = await db.execute(select(OrderItems).where(
-        OrderItems.order_id == order.order_id))
-
-    order_items = result.scalars().all()
-
-    if not order_items:
-        raise HTTPException(
-            status_code=404, detail=f"Order {order.order_id} not found")
-
-    result = await db.execute(select(Order).where(
-        Order.order_id == order.order_id))
-
-    searched_order = result.scalar_one_or_none()
-
-    if searched_order.customer_id != current_user.user_id:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Get order items failed",
-            "method": "POST",
-            "error": "Not authorized to get order items.",
-            "path": "/order_items/get_order_item",
-            "user_id": current_user.user_id,
-            "order_id": searched_order.order_id,
-            "status_code": 403,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
-
-        raise HTTPException(
-            status_code=403, detail="Not authorized to get this order")
-
-    end_time = datetime.now(UTC)
-    info = {
-        "event": "Get order items succeeded",
-        "method": "POST",
-        "path": "/order_items/get_order_item",
-        "user_id": current_user.user_id,
-        "order_id": order.order_id,
-        "status_code": 200,
-        "duration": (end_time - start_time).total_seconds()
-    }
-    logger.info(info)
-
-    return order_items
-
-
-async def update_order_item(order: OrderUpdateById, order_items: list[OrderItemsUpdate], current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
+async def update_order_item(order: OrderUpdateById, order_items: list[OrderItemsUpdate], audit: AuditContext, current_user: Person, db: AsyncSession):
     try:
+        new_value = dict()
+        old_value = dict()
+        counter = 0
         result = await db.execute(select(Order).where(
-            Order.order_id == order.order_id))
+            Order.order_id == order.order_id).with_for_update())
 
         searched_order = result.scalar_one_or_none()
 
-        if not searched_order:
-            raise HTTPException(status_code=404, detail='No order item found')
+        if searched_order is None:
+            raise HTTPException(status_code=404, detail='No order found')
 
-        if searched_order.customer_id != current_user.user_id:
-            end_time = datetime.now(UTC)
-            error = {
-                "event": "Update order items failed",
-                "method": "POST",
-                "error": "Not authorized to get order items.",
-                "path": "/order_items/update_order_item",
-                "user_id": current_user.user_id,
-                "order_id": searched_order.order_id,
-                "status_code": 403,
-                "duration": (end_time - start_time).total_seconds()
-            }
-            logger.error(error)
-
+        if searched_order.customer_id != current_user.user_id and current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
             raise HTTPException(
-                status_code=403, detail="Not authorized to  update the order")
+                status_code=404, detail="Order not found")
 
         if searched_order.order_status != OrderStatus.UNCONFIRMED:
             raise HTTPException(
                 status_code=400, detail='Not allowed to update the order anymore')
 
+        products = dict()
+        for i in range(len(order_items)):
+            if products and order_items[i].product_name in products.keys():
+                products[order_items[i].product_name].append(i)
+            else:
+                products[order_items[i].product_name] = [i]
+
+        for ordered_product in products.keys():
+            total_quantity = 0
+            if len(products[ordered_product]) > 1:
+                for i in products[ordered_product]:
+                    total_quantity += order_items[i].quantity
+                    if i != min(products[ordered_product]):
+                        order_items[i] = "None"
+
+                    order_items[min(products[ordered_product])
+                                ].quantity = total_quantity
+
+        for item in order_items:
+            if item == "None":
+                order_items.remove(item)
+
         updated_list = []
-        total_amount = 0
+        total_amount = Decimal("0")
         for i in range(len(order_items)):
             result = await db.execute(select(Product).where(
-                Product.product_name == order_items[i].product_name))
+                func.lower(Product.product_name) == order_items[i].product_name.lower()))
 
             product = result.scalar_one_or_none()
 
@@ -111,7 +77,7 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
                     status_code=404, detail='Product not found')
 
             result = await db.execute(select(OrderItems).where(
-                OrderItems.order_id == order.order_id, OrderItems.product_id == product.product_id))
+                OrderItems.order_id == order.order_id, OrderItems.product_id == product.product_id).with_for_update())
 
             searched_order_item = result.scalar_one_or_none()
 
@@ -120,6 +86,7 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
                     raise HTTPException(
                         status_code=400, detail=f"Product {product.product_name} doesn't have enough amount.")
 
+                counter += 1
                 new_order_item = OrderItems(
                     order_id=order.order_id,
                     product_id=product.product_id,
@@ -127,11 +94,14 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
                     unit_price=product.unit_price
                 )
 
-                product.remain_in_stock -= order_items[i].quantity
                 total_amount += order_items[i].quantity*product.unit_price
 
                 db.add(new_order_item)
                 await db.flush()
+
+                new_value[f"new_order_item{counter}"] = {column.key: getattr(
+                    new_order_item, column.key) for column in inspect(OrderItems).mapper.column_attrs}
+
                 await db.refresh(new_order_item)
                 updated_list.append(new_order_item)
                 continue
@@ -141,26 +111,27 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
                     status_code=400, detail=f"Product {product.product_name} doesn't have enough amount.")
 
             if order_items[i].quantity > searched_order_item.quantity:
-                product.remain_in_stock -= order_items[i].quantity - \
-                    searched_order_item.quantity
-
                 total_amount += (order_items[i].quantity -
                                  searched_order_item.quantity)*product.unit_price
 
             if order_items[i].quantity < searched_order_item.quantity:
-                product.remain_in_stock += searched_order_item.quantity - \
-                    order_items[i].quantity
-
                 total_amount += (order_items[i].quantity -
                                  searched_order_item.quantity)*product.unit_price
 
+            old_value[f"existed order for product {product.product_id}"] = {column.key: getattr(
+                searched_order_item, column.key) for column in inspect(OrderItems).mapper.column_attrs}
+
             searched_order_item.quantity = order_items[i].quantity
+            await db.flush()
+
+            new_value[f"existed order for product {product.product_id}"] = {column.key: getattr(
+                searched_order_item, column.key) for column in inspect(OrderItems).mapper.column_attrs}
 
             updated_list.append(searched_order_item)
-            await db.flush()
             await db.refresh(searched_order_item)
 
-        searched_order.total_amount_without_discount += total_amount
+        old_value[f"order {searched_order.order_id}"] = {column.key: getattr(
+            searched_order, column.key) for column in inspect(Order).mapper.column_attrs}
 
         if searched_order.discount:
             result = await db.execute(select(Discount).where(
@@ -170,7 +141,7 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
 
             if discount:
                 result = await db.execute(select(DiscountGranted).where(DiscountGranted.discount_id ==
-                                                                        discount.discount_id, DiscountGranted.order_id == order.order_id))
+                                                                        discount.discount_id, DiscountGranted.order_id == order.order_id).with_for_update())
 
                 person_discount = result.scalar_one_or_none()
 
@@ -186,80 +157,69 @@ async def update_order_item(order: OrderUpdateById, order_items: list[OrderItems
         else:
             searched_order.total_amount_discounted = searched_order.total_amount_without_discount
 
+        await db.flush()
+        new_value[f"order {searched_order.order_id}"] = {column.key: getattr(
+            searched_order, column.key) for column in inspect(Order).mapper.column_attrs}
+
         result = await db.execute(select(PaymentHistory).where(
-            PaymentHistory.order_id == order.order_id))
+            PaymentHistory.order_id == order.order_id).with_for_update())
 
         payment_history = result.scalar_one_or_none()
 
-        if payment_history:
-            payment_history.payment_amount = searched_order.total_amount_discounted
+        if payment_history is None:
+            raise HTTPException(
+                status_code=404, detail=f"No payment history found for order {searched_order.order_id}")
 
-        end_time = datetime.now(UTC)
-        info = {
-            "event": "Update order items succeeded",
-            "method": "POST",
-            "path": "/order_items/update_order_item",
-            "user_id": current_user.user_id,
-            "order_id": order.order_id,
-            "status_code": 200,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.info(info)
+        payment_history.payment_amount = searched_order.total_amount_discounted
+
+        await create_audit_log(
+            db=db,
+            audit=audit,
+            user_id=current_user.user_id,
+            entity_id=order.order_id,
+            entity_type="order",
+            event="ORDER_ITEM_UPDATED",
+            old_value=old_value,
+            new_value=new_value
+        )
 
         await db.commit()
         return updated_list
 
-    except Exception as ex:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Update order items failed",
-            "method": "POST",
-            "error": f"{ex}",
-            "path": "/order_items/update_order_item",
-            "user_id": current_user.user_id,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
+    except HTTPException:
+        await db.rollback()
+        raise
+
+    except Exception:
+        logger.error(f"Update order {order.order_id} items failed")
 
         await db.rollback()
-        raise ex
+        raise
 
 
-async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItemsDelete], current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
+async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItemsDelete], audit: AuditContext, current_user: Person, db: AsyncSession):
     try:
+        old_value = dict()
+        new_value = dict()
         result = await db.execute(select(Order).where(
-            Order.order_id == order.order_id))
+            Order.order_id == order.order_id).with_for_update())
 
         searched_order = result.scalar_one_or_none()
 
-        if not searched_order:
+        if searched_order is None:
             raise HTTPException(status_code=404, detail='No order item found')
 
-        if searched_order.customer_id != current_user.user_id:
-            end_time = datetime.now(UTC)
-            error = {
-                "event": "Delete order items failed",
-                "method": "POST",
-                "error": "Not authorized to get order items.",
-                "path": "/order_items/delete_order_item",
-                "user_id": current_user.user_id,
-                "order_id": searched_order.order_id,
-                "status_code": 403,
-                "duration": (end_time - start_time).total_seconds()
-            }
-            logger.error(error)
-
+        if searched_order.customer_id != current_user.user_id and current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
             raise HTTPException(
-                status_code=403, detail="Not authorized to delete the order items")
+                status_code=404, detail=f"Order {order.order_id} not found")
 
         if searched_order.order_status != OrderStatus.UNCONFIRMED:
             raise HTTPException(
-                status_code=400, detail='Not allowed to delete the order anymore')
+                status_code=400, detail='Not allowed to change the order anymore')
 
         for i in range(len(order_items)):
             result = await db.execute(select(Product).where(
-                Product.product_name == order_items[i].product_name))
+                func.lower(Product.product_name) == order_items[i].product_name.lower()))
 
             product = result.scalar_one_or_none()
 
@@ -268,7 +228,7 @@ async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItems
                     status_code=404, detail='Product not found')
 
             result = await db.execute(select(OrderItems).where(
-                OrderItems.order_id == order.order_id, OrderItems.product_id == product.product_id))
+                OrderItems.order_id == order.order_id, OrderItems.product_id == product.product_id).with_for_update())
 
             searched_order_item = result.scalar_one_or_none()
 
@@ -276,16 +236,22 @@ async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItems
                 raise HTTPException(
                     status_code=404, detail='Order item not found')
 
-            product.remain_in_stock += searched_order_item.quantity
+            old_value.update({column.key: getattr(searched_order_item, column.key)
+                             for column in inspect(Order).mapper.column_attrs})
+
             searched_order.total_amount_without_discount -= searched_order_item.quantity * \
                 searched_order_item.unit_price
+
+            await db.flush()
+            new_value.update({column.key: getattr(searched_order_item, column.key)
+                             for column in inspect(Order).mapper.column_attrs})
 
             await db.delete(searched_order_item)
 
         await db.flush()
 
         result = await db.execute(select(func.count()).select_from(OrderItems).where(
-            OrderItems.order_id == order.order_id))
+            OrderItems.order_id == order.order_id).with_for_update())
 
         remaining_items = result.scalar_one()
 
@@ -299,12 +265,19 @@ async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItems
 
                 if user_discount:
                     result = await db.execute(select(DiscountGranted).where(DiscountGranted.discount_id ==
-                                                                            user_discount.discount_id, DiscountGranted.order_id == order.order_id))
+                                                                            user_discount.discount_id, DiscountGranted.order_id == order.order_id).with_for_update())
                     person_discount = result.scalar_one_or_none()
 
                     if person_discount:
+                        old_value.update({column.key: getattr(
+                            person_discount, column.key) for column in inspect(Discount).mapper.column_attrs})
+
                         person_discount.used = False
                         person_discount.used_at = None
+                        await db.flush()
+
+                        new_value.update({column.key: getattr(
+                            person_discount, column.key) for column in inspect(Discount).mapper.column_attrs})
 
         elif searched_order.discount:
             result = await db.execute(select(Discount).where(
@@ -314,10 +287,13 @@ async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItems
 
             if discount:
                 result = await db.execute(select(DiscountGranted).where(DiscountGranted.discount_id ==
-                                                                        discount.discount_id, DiscountGranted.order_id == order.order_id))
+                                                                        discount.discount_id, DiscountGranted.order_id == order.order_id).with_for_update())
                 person_discount = result.scalar_one_or_none()
 
                 if person_discount:
+                    old_value.update({column.key: getattr(
+                        searched_order, column.key) for column in inspect(Order).mapper.column_attrs})
+
                     if discount.discount_type == DiscountType.PERCENT:
                         searched_order.total_amount_discounted = searched_order.total_amount_without_discount * \
                             (Decimal("100")-discount.amount)/Decimal("100")
@@ -326,12 +302,23 @@ async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItems
 
                     searched_order.total_amount_discounted = max(
                         Decimal("0"), searched_order.total_amount_discounted)
+                    await db.flush()
+
+                    new_value.update({column.key: getattr(
+                        searched_order, column.key) for column in inspect(Order).mapper.column_attrs})
 
         else:
+            old_value.update({column.key: getattr(searched_order, column.key)
+                             for column in inspect(Order).mapper.column_attrs})
+
             searched_order.total_amount_discounted = searched_order.total_amount_without_discount
+            await db.flush()
+
+            new_value.update({column.key: getattr(searched_order, column.key)
+                             for column in inspect(Order).mapper.column_attrs})
 
         result = await db.execute(select(PaymentHistory).where(
-            PaymentHistory.order_id == order.order_id))
+            PaymentHistory.order_id == order.order_id).with_for_update())
 
         payment_history = result.scalar_one_or_none()
 
@@ -340,18 +327,24 @@ async def delete_order_item(order: OrderUpdateById, order_items: list[OrderItems
 
         await db.commit()
 
+        await create_audit_log(
+            db=db,
+            audit=audit,
+            user_id=current_user.user_id,
+            entity_id=order.order_id,
+            entity_type="order",
+            event="ORDER_ITEM(S)_DELETED",
+            old_value=old_value,
+            new_value=new_value
+        )
+
         return {"Item(s) deleted successfully."}
 
-    except Exception as ex:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Delete order items failed",
-            "method": "POST",
-            "error": f"{ex}",
-            "path": "/order_items/delete_order_item",
-            "user_id": current_user.user_id,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
-
+    except HTTPException:
         await db.rollback()
+        raise
+
+    except Exception:
+        logger.error(f"Delete order items for order {order.order_id} failed")
+        await db.rollback()
+        raise

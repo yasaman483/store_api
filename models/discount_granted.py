@@ -9,12 +9,13 @@ class DiscountGranted(Base):
 
     discount_id: Mapped[int] = mapped_column(Integer, ForeignKey(
         "discounts.discount_id", ondelete="cascade"), primary_key=True)
-    order_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("orders.order_id", ondelete="set null"), nullable=True, default=None)
-    people_id: Mapped[int] = mapped_column(Integer, ForeignKey(
+    order_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("orders.order_id", ondelete="cascade"), nullable=True, default=None)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey(
         "people.user_id", ondelete="cascade"), primary_key=True)
     used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    used_at: Mapped[date] = mapped_column(Date, nullable=True, default=None)
+    used_at: Mapped[date | None] = mapped_column(
+        Date, nullable=True, default=None)
 
     discount = relationship("Discount", back_populates="discount_granted")
     people = relationship("Person", back_populates="discounts")

@@ -1,35 +1,28 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.connect import get_db
-from crud.orders import create_order, get_all_orders, get_order_by_id, update_order, delete_order
-from schemas.orders import OrderResponse, OrderUpdateById, OrderCreate, OrderUpdateByStatus
+from crud.orders import get_all_orders, update_order, cancel_order
+from schemas.orders import FullOrderResponse, OrderUpdateById, OrderUpdateByStatus, FilterOrderInfo, GetOrderInfo
 from models.people import Person
 import auth
+from crud.audit_log import create_audit_context
 
 
 router = APIRouter(prefix='/orders', tags=['Orders'])
 
 
-@router.post('/add_order', response_model=OrderResponse)
-async def add_order(order: OrderCreate, current_user: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
-    return await create_order(order, current_user, db)
+@router.post('/get_all_orders', response_model=GetOrderInfo)
+async def read_all_orders(filter_order: FilterOrderInfo, current_uer: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
+    return await get_all_orders(filter_order, current_uer, db)
 
 
-@router.post('/get_all_orders', response_model=list[OrderResponse])
-async def read_all_orders(current_uer: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
-    return await get_all_orders(current_uer, db)
-
-
-@router.post('/get_order_by_id', response_model=OrderResponse)
-async def read_order_by_id(order: OrderUpdateById, current_user: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
-    return await get_order_by_id(order, current_user, db)
-
-
-@router.put('/edit_order', response_model=OrderResponse)
-async def edit_order_status(current_order: OrderUpdateById, new_order: OrderUpdateByStatus, current_user: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
-    return await update_order(current_order, new_order, current_user, db)
+@router.patch('/edit_order', response_model=FullOrderResponse)
+async def edit_order_status(current_order: OrderUpdateById, new_order: OrderUpdateByStatus, request: Request, current_user: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
+    audit = create_audit_context(request)
+    return await update_order(current_order, new_order, audit, current_user, db)
 
 
 @router.delete('/delete_order')
-async def remove_order(order: OrderUpdateById, current_uer: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
-    return await delete_order(order, current_uer, db)
+async def remove_order(order: OrderUpdateById, request: Request, current_uer: Person = Depends(auth.get_current_user), db: AsyncSession = Depends(get_db)):
+    audit = create_audit_context(request)
+    return await cancel_order(order, audit, current_uer, db)

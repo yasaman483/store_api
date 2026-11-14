@@ -1,7 +1,7 @@
-from sqlalchemy import Integer, Date, DECIMAL, String, ForeignKey, func, Enum as SQLEnum
+from sqlalchemy import Integer, DECIMAL, String, ForeignKey, func, Enum as SQLEnum, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from schemas.orders import OrderStatus, PaymentMethod
-from datetime import date
+from schemas.orders import OrderStatus, PaymentMethod, ReservationStatus
+from datetime import datetime, timedelta
 from database.connect import Base
 from decimal import Decimal
 
@@ -12,19 +12,23 @@ class Order(Base):
     order_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True)
     customer_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("people.user_id", ondelete='cascade'), nullable=False)
-    order_date: Mapped[date] = mapped_column(
-        Date, server_default=func.now())
+        Integer, ForeignKey("people.user_id", ondelete='NO ACTION'), nullable=False)
+    order_date: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.current_timestamp())
     order_status: Mapped[OrderStatus] = mapped_column(
         SQLEnum(OrderStatus), nullable=False)
+    reservation_status: Mapped[ReservationStatus] = mapped_column(
+        SQLEnum(ReservationStatus), default=ReservationStatus.ACTIVE, nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(
         SQLEnum(PaymentMethod), nullable=False)
     total_amount_without_discount: Mapped[Decimal] = mapped_column(
         DECIMAL, nullable=False)
-    discount: Mapped[str] = mapped_column(
+    discount: Mapped[str | None] = mapped_column(
         String(100), nullable=True, default=None)
     total_amount_discounted: Mapped[Decimal] = mapped_column(
         DECIMAL, nullable=False)
+    expired_reservation_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=func.current_timestamp()+timedelta(minutes=30))
 
     customer = relationship(
         "Person", back_populates="orders")

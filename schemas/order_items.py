@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from decimal import Decimal
 
 
@@ -13,6 +13,13 @@ class OrderItemsCreate(OrderItemsBase):
 class OrderItemsUpdate(BaseModel):
     product_name: str
     quantity: int
+
+    @field_validator("quantity")
+    @classmethod
+    def validate_quantity(cls, value: int):
+        if value < 0:
+            raise ValueError("Quantity shouldn't be less than zero")
+        return value
 
 
 class OrderItemsDelete(BaseModel):

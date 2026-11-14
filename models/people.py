@@ -2,7 +2,7 @@ from sqlalchemy import Integer, String, Date, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database.connect import Base
 from datetime import date
-from schemas.people import Roles
+from schemas.people import Roles, PersonStatus
 
 
 class Person(Base):
@@ -17,9 +17,13 @@ class Person(Base):
     address: Mapped[str] = mapped_column(String(100), nullable=False)
     city: Mapped[str] = mapped_column(String(50), nullable=False)
     role: Mapped[Roles] = mapped_column(SQLEnum(Roles), nullable=False)
+    person_status: Mapped[PersonStatus] = mapped_column(
+        SQLEnum(PersonStatus), nullable=False, default=PersonStatus.ACTIVE)
 
-    person = relationship("Wallet", back_populates="customer")
     discounts = relationship("DiscountGranted", back_populates="people")
     employee_info = relationship(
-        "EmployeeInfo", back_populates="employee", cascade="all, delete-orphan")
+        "EmployeeInfo", back_populates="employee", uselist=False, cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="customer")
+    wallet = relationship("Wallet", back_populates="customer", uselist=False,
+                          cascade="all, delete-orphan")
+    caret = relationship("Caret", back_populates="customer")

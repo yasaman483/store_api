@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Integer, Date, DECIMAL, Boolean, Enum as SQLEnum
 from database.connect import Base
-from schemas.discount import DiscountType
+from schemas.discount import DiscountType, DiscountStatus
 from decimal import Decimal
 from datetime import date
 
@@ -17,6 +17,8 @@ class Discount(Base):
     amount: Mapped[Decimal] = mapped_column(DECIMAL(12, 2), nullable=False)
     expired_at: Mapped[date] = mapped_column(Date, nullable=False)
     active_for_all: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    discount_status: Mapped[DiscountStatus] = mapped_column(
+        SQLEnum(DiscountStatus), nullable=False)
 
     discount_granted = relationship(
         "DiscountGranted", back_populates="discount", cascade="all, delete-orphan")

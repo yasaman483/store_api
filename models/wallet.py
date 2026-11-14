@@ -15,4 +15,4 @@ class Wallet(Base):
         DECIMAL(12, 2), nullable=False, default=0)
 
     customer = relationship(
-        "Person", back_populates="person")
+        "Person", back_populates="wallet")

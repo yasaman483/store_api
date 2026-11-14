@@ -52,13 +52,17 @@ def verify_access_token(token: str):
 
     except jwt.InvalidTokenError as ex:
         error = {
-            "event": "There are something wrong on the token {token}", "error": ex}
+            "event": "There are something wrong on the token",
+            "error": ex
+        }
         logger.error(error)
         return None
 
-    except Exception as ex:
+    except Exception:
         error = {
-            "event": "There are some errors in between of verifying access token", "error": ex}
+            "event": "There are some errors in between of verifying access token",
+            "error": ex
+        }
         logger.error(error)
         return None
 
@@ -68,7 +72,7 @@ def verify_access_token(token: str):
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: AsyncSession = Depends(get_db)):
     if credentials is None:
-        return None
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     token = credentials.credentials
     user_id = verify_access_token(token)
@@ -79,9 +83,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
 
     try:
         user_id_int = int(user_id)
-    except Exception as ex:
-        error = {"event": "Some error occured during getting current user for validation",
-                 "error": ex, "user_id": user_id_int}
+    except HTTPException:
+        error = {
+            "event": "Invalid user_id in access token",
+            "user_id": user_id
+        }
         logger.error(error)
 
         raise HTTPException(
@@ -91,8 +97,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
 
     user = result.scalar_one_or_none()
 
-    if not user:
+    if user is None:
         raise HTTPException(
             status_code=404, detail=f"User {user_id} not found")
 
     return user
+
+
+async def get_user_sign_up(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: AsyncSession = Depends(get_db)):
+    if credentials is None:
+        return None
+
+    return await get_current_user(credentials, db)

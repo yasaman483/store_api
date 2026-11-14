@@ -1,126 +1,74 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, asc, desc, func
+from sqlalchemy.orm import selectinload
 from models.payment_history import PaymentHistory
 from models.people import Person
 from models.orders import Order
 from schemas.people import Roles
-from schemas.payment_history import GetPaymentHistoryId
-from datetime import datetime, UTC
+from schemas.payment_history import FilterPaymentHistory, GetPaymentHistory
+from schemas.wallet import SortOrder
+from math import ceil
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-async def get_payment_histories(current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Get payment histories failed",
-            "method": "POST",
-            "error": "Not authorized to get payment histories",
-            "path": "/payment_history/read_payment_histories",
-            "user_id": current_user.user_id,
-            "status_code": 403,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
+async def get_payment_histories(filter_payment_history: FilterPaymentHistory, current_user: Person, db: AsyncSession):
+    filters = []
+    if filter_payment_history.payment_status is not None:
+        filters.append(PaymentHistory.payment_status ==
+                       filter_payment_history.payment_status)
+    if filter_payment_history.min_payment_amount is not None:
+        filters.append(PaymentHistory.payment_amount >=
+                       filter_payment_history.min_payment_amount)
+    if filter_payment_history.max_payment_amount is not None:
+        filters.append(PaymentHistory.payment_amount <=
+                       filter_payment_history.max_payment_amount)
+    if filter_payment_history.payment_after_date is not None:
+        filters.append(PaymentHistory.payment_date >=
+                       filter_payment_history.payment_after_date)
+    if filter_payment_history.payment_befor_date is not None:
+        filters.append(PaymentHistory.payment_date <=
+                       filter_payment_history.payment_befor_date)
 
-        result = await db.execute(select(Order).where(
-            Order.customer_id == current_user.user_id))
+    if current_user.role == Roles.CUSTOMER:
+        if filter_payment_history.order_id is not None:
+            filters.append(PaymentHistory.order.has(
+                Order.order_id == filter_payment_history.order_id))
+        if filter_payment_history.payment_id is not None:
+            filters.append(PaymentHistory.payment_id ==
+                           filter_payment_history.payment_id)
 
-        orders = result.scalars().all()
+    elif current_user.role == Roles.MANAGER or current_user.role == Roles.EMPLOYEE:
+        if filter_payment_history.order_id is not None:
+            filters.append(PaymentHistory.order_id ==
+                           filter_payment_history.order_id)
+        if filter_payment_history.payment_id is not None:
+            filters.append(PaymentHistory.payment_id ==
+                           filter_payment_history.payment_id)
 
-        if not orders:
-            raise HTTPException(
-                status_code=404, detail=f"No payment history found for {current_user.first_name} {current_user.last_name}")
+    query = select(PaymentHistory).options(
+        selectinload(PaymentHistory.order)).where(*filters)
 
-        payment_histories = []
+    result = select(func.count()).select_from(query.subquery())
+    total = await db.scalar(result)
+    offset = (filter_payment_history.page - 1)*filter_payment_history.page_size
 
-        for i in range(len(orders)):
-            result = await db.execute(select(PaymentHistory).where(
-                PaymentHistory.order_id == orders[i].order_id))
+    if filter_payment_history.sort_order == SortOrder.ASC:
+        query = query.order_by(asc(filter_payment_history.sort_by)).offset(
+            offset).limit(filter_payment_history.page_size)
 
-            payment_history = result.scalar_one_or_none()
+    if filter_payment_history.sort_order == SortOrder.DES:
+        query = query.order_by(desc(filter_payment_history.sort_by)).offset(
+            offset).limit(filter_payment_history.page_size)
 
-            if payment_history is None:
-                raise HTTPException(
-                    status_code=404, detail=f"Payment history for order {orders[i].order_id} not found")
+    result = await db.execute(query)
 
-            payment_histories.append(payment_history)
+    payment_histories = result.scalars().all()
 
-        end_time = datetime.now(UTC)
-        info = {
-            "event": "Get payment histories succeeded",
-            "method": "POST",
-            "path": "/payment_history/read_payment_histories",
-            "user_id": current_user.user_id,
-            "status_code": 200,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.info(info)
-
-        return payment_histories
-
-    else:
-        result = await db.execute(select(PaymentHistory))
-
-        payment_histories = result.scalars().all()
-
-        if not payment_histories:
-            raise HTTPException(
-                status_code=404, detail="No payment history found")
-
-        end_time = datetime.now(UTC)
-        info = {
-            "event": "Get payment histories succeeded",
-            "method": "POST",
-            "path": "/payment_history/read_payment_histories",
-            "user_id": current_user.user_id,
-            "status_code": 200,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.info(info)
-
-        return payment_histories
-
-
-async def get_payment_history_by_id(payment_history: GetPaymentHistoryId, current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Get payment history by id failed",
-            "method": "POST",
-            "error": "Not authorized to get payment history",
-            "path": "/payment_history/read_payment_history_by_id",
-            "user_id": current_user.user_id,
-            "payment_history": payment_history.payment_id,
-            "status_code": 403,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    result = await db.execute(select(PaymentHistory).where(PaymentHistory.payment_id == payment_history.payment_id))
-
-    searched_payment_history = result.scalar_one_or_none()
-
-    if searched_payment_history is None:
+    if not payment_histories:
         raise HTTPException(
-            status_code=404, detail=f"Payment history {payment_history.payment_id} not found")
+            status_code=404, detail="No payment history found")
 
-    end_time = datetime.now(UTC)
-    info = {
-        "event": "Get payment history by id succeeded",
-        "method": "POST",
-        "path": "/payment_history/read_payment_history_by_id",
-        "user_id": current_user.user_id,
-        "payment_history": payment_history.payment_id,
-        "status_code": 200,
-        "duration": (end_time - start_time).total_seconds()
-    }
-    logger.info(info)
-
-    return searched_payment_history
+    return GetPaymentHistory(payment_histories=payment_histories, page=filter_payment_history.page, page_size=filter_payment_history.page_size, total=total, pages=ceil(total/filter_payment_history.page_size))

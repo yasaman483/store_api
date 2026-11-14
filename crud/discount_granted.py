@@ -1,107 +1,63 @@
 from models.people import Person
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, asc, desc
 from models.discount_granted import DiscountGranted
-from models.discount import Discount
 from fastapi import HTTPException
 from schemas.people import Roles
-from schemas.discount import DiscountUpdateGet
-from schemas.discount_granted import GetDiscountId
-from datetime import datetime, UTC
+from schemas.discount_granted import DiscountGrantedFilter, GetDiscountGranted
 import logging
+from schemas.wallet import SortOrder
+from math import ceil
 
 logger = logging.getLogger(__name__)
 
 
-async def get_people_by_discount_name(discount: DiscountUpdateGet, current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Get granted discounts by discount name failed",
-            "method": "POST",
-            "error": "Not authorized to get people using discount name",
-            "path": "/discount_granted/get_people_by_discount_name",
-            "user_id": current_user.user_id,
-            "discount_name": discount.discount_name,
-            "status_code": 403,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
-        raise HTTPException(
-            status_code=403, detail=f"Not authorized to get people who got discounts")
+async def get_discount_granted(filter_discount: DiscountGrantedFilter, current_user: Person, db: AsyncSession):
+    if current_user.role == Roles.CUSTOMER:
+        query = select(DiscountGranted).where(
+            DiscountGranted.user_id == current_user.user_id)
 
-    result = await db.execute(select(Discount).where(
-        Discount.discount_name == discount.discount_name))
+        result = select(func.count()).select_from(query.subquery())
+        total = await db.scalar(result)
 
-    searched_discount = result.scalar_one_or_none()
+        result = await db.execute(query)
+        discounts = result.scalars().all()
 
-    if searched_discount is None:
-        raise HTTPException(
-            status_code=404, detail=f"Discount {discount.discount_name} not found")
+        return GetDiscountGranted(discount_granted=discounts, page=filter_discount.page, page_size=filter_discount.page_size, total=total, pages=ceil(total/filter_discount.page_size))
 
-    result = await db.execute(select(DiscountGranted).where(
-        DiscountGranted.discount_id == searched_discount.discount_id))
+    elif current_user.role == Roles.MANAGER or current_user.role == Roles.EMPLOYEE:
+        filters = []
+        if filter_discount.discount_id is not None:
+            filters.append(DiscountGranted.discount_id ==
+                           filter_discount.discount_id)
+        if filter_discount.order_id is not None:
+            filters.append(DiscountGranted.order_id ==
+                           filter_discount.order_id)
+        if filter_discount.user_id is not None:
+            filters.append(DiscountGranted.user_id == filter_discount.user_id)
+        if filter_discount.used is not None:
+            filters.append(DiscountGranted.used == filter_discount.used)
+        if filter_discount.used_at is not None:
+            filters.append(DiscountGranted.used_at == filter_discount.used_at)
 
-    people = result.scalars().all()
+        query = select(DiscountGranted).where(*filters)
+        result = select(func.count()).select_from(query.subquery())
+        total = await db.scalar(result)
+        offset = (filter_discount.page - 1)*filter_discount.page_size
 
-    end_time = datetime.now(UTC)
-    info = {
-        "event": "Get granted discounts by discount name succeeded",
-        "method": "POST",
-        "path": "/discount_granted/get_people_by_discount_name",
-        "user_id": current_user.user_id,
-        "discount_name": discount.discount_name,
-        "status_code": 200,
-        "duration": (end_time - start_time).total_seconds()
-    }
-    logger.info(info)
+        if filter_discount.sort_order == SortOrder.ASC:
+            query = query.order_by(asc(filter_discount.sort_by)).offset(
+                offset).limit(filter_discount.page_size)
 
-    return people
+        elif filter_discount.sort_order == SortOrder.DES:
+            query = query.order_by(desc(filter_discount.sort_by)).offset(
+                offset).limit(filter_discount.page_size)
 
+        result = await db.execute(query)
+        discount_granted = result.scalars().all()
 
-async def get_people_by_discount_id(discount: GetDiscountId, current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    if current_user.role != Roles.MANAGER and current_user.role != Roles.EMPLOYEE:
-        end_time = datetime.now(UTC)
-        error = {
-            "event": "Get granted discounts by discount id failed",
-            "method": "POST",
-            "error": "Not authorized to get people using discount id",
-            "path": "/discount_granted/get_people_by_discount_id",
-            "user_id": current_user.user_id,
-            "discount_id": discount.discount_id,
-            "status_code": 403,
-            "duration": (end_time - start_time).total_seconds()
-        }
-        logger.error(error)
-        raise HTTPException(
-            status_code=403, detail=f"Not authorized to get people who got discounts")
+        if not discount_granted:
+            raise HTTPException(
+                status_code=404, detail="No discount granted found")
 
-    result = await db.execute(select(Discount).where(
-        Discount.discount_id == discount.discount_id))
-
-    searched_discount = result.scalar_one_or_none()
-
-    if searched_discount is None:
-        raise HTTPException(
-            status_code=404, detail=f"Discount {discount.discount_id} not found")
-
-    result = await db.execute(select(DiscountGranted).where(
-        DiscountGranted.discount_id == searched_discount.discount_id))
-
-    people = result.scalars().all()
-
-    end_time = datetime.now(UTC)
-    info = {
-        "event": "Get granted discounts by discount id succeeded",
-        "method": "POST",
-        "path": "/discount_granted/get_people_by_discount_id",
-        "user_id": current_user.user_id,
-        "discount_id": discount.discount_id,
-        "status_code": 200,
-        "duration": (end_time - start_time).total_seconds()
-    }
-    logger.info(info)
-
-    return people
+        return GetDiscountGranted(discount_granted=discount_granted, page=filter_discount.page, page_size=filter_discount.page_size, total=total, pages=ceil(total/filter_discount.page_size))

@@ -1,67 +1,130 @@
 from fastapi import HTTPException
 from models.people import Person
-from sqlalchemy import select
+from sqlalchemy import select, asc, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.inspection import inspect
 from models.wallet import Wallet
-from schemas.wallet import UpdateAmount
-from decimal import Decimal
-from datetime import datetime, UTC
+from schemas.wallet import UpdateWalletAmount, FilterWallets, SortOrder, GetWallets
+from schemas.people import Roles, PersonStatus
 import logging
+from crud.audit_log import create_audit_log
+from schemas.audit import AuditContext
+from decimal import Decimal
+from datetime import date
+from math import ceil
+
 
 logger = logging.getLogger(__name__)
 
 
-async def update_wallet_amount(added_amount: UpdateAmount, current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    if added_amount.amount < 0:
-        raise HTTPException(status_code=401, detail="Amount must be positive.")
+def make_json_format(value: dict):
+    for key, val in value.items():
+        if isinstance(val, Decimal):
+            value[key] = str(value[key])
+        elif isinstance(val, date):
+            value[key] = value[key].isoformat()
+    return value
 
-    result = await db.execute(select(Wallet).where(
-        Wallet.customer_id == current_user.user_id))
+
+async def update_wallet_amount(wallet: UpdateWalletAmount, audit: AuditContext, current_user: Person, db: AsyncSession, auto_commit: bool = True):
+    if current_user.role == Roles.CUSTOMER:
+        user_id = current_user.user_id
+
+        result = await db.execute(select(Person).where(Person.user_id == current_user.user_id))
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if user.person_status == PersonStatus.UNACTIVE:
+            raise HTTPException(
+                status_code=403, detail="The account is unactivated")
+
+        result = await db.execute(select(Wallet).where(
+            Wallet.customer_id == current_user.user_id).with_for_update())
+
+    elif current_user.role == Roles.MANAGER or current_user.role == Roles.EMPLOYEE:
+        user_id = wallet.user_id
+
+        result = await db.execute(select(Person).where(Person.user_id == wallet.user_id))
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if user.person_status == PersonStatus.UNACTIVE:
+            raise HTTPException(
+                status_code=403, detail="The account is unactivated")
+
+        result = await db.execute(select(Wallet).where(
+            Wallet.customer_id == wallet.user_id).with_for_update())
+
+    else:
+        raise HTTPException(
+            status_code=403, detail="Not allowed to change the wallet")
 
     user_wallet = result.scalar_one_or_none()
 
     if user_wallet is None:
         raise HTTPException(
-            status_code=404, detail=f"Wallet not found for user {current_user.user_id}")
+            status_code=404, detail=f"Wallet not found")
 
-    user_wallet.wallet_balance += added_amount.amount
+    old_value = {column.key: getattr(user_wallet, column.key)
+                 for column in inspect(Wallet).mapper.column_attrs}
+
+    user_wallet.wallet_balance += wallet.amount
+    await db.flush()
+
+    new_value = {column.key: getattr(user_wallet, column.key)
+                 for column in inspect(Wallet).mapper.column_attrs}
+
+    new_value = make_json_format(new_value)
+    old_value = make_json_format(old_value)
 
     try:
-        await db.commit()
-        await db.refresh(user_wallet)
-        end_time = datetime.now(UTC)
-        duration_time = (end_time - start_time).total_seconds()
-        info = {
-            "event": "Amount added successfully",
-            "path": "/Wallet/update_wallet_amount",
-            "user_id": user_wallet.customer_id,
-            "status_code": 200,
-            "duration_s": duration_time
-        }
-        logger.info(info)
+        await create_audit_log(
+            db=db,
+            audit=audit,
+            user_id=current_user.user_id,
+            entity_id=user_wallet.wallet_id,
+            entity_type="wallet",
+            event="WALLET_UPDATED",
+            old_value=old_value,
+            new_value=new_value
+        )
+
+        if auto_commit:
+            await db.commit()
+            await db.refresh(user_wallet)
         return user_wallet
-    except Exception as e:
-        end_time = datetime.now(UTC)
-        duration_time = (end_time - start_time).total_seconds()
-        error = {
-            "event": "Amount wasn't added to the wallet",
-            "path": "/Wallet/update_wallet_amount",
-            "user_id": user_wallet.customer_id,
-            "duration_s": duration_time
-        }
-        logger.error(error)
+
+    except Exception:
+        logger.exception(
+            f"Amount wasn't added to the wallet successfully for user {user_id}")
         await db.rollback()
-        raise e
+        raise
 
 
-async def deduct_from_wallet(amount: Decimal, current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    if amount < 0:
-        raise HTTPException(status_code=401, detail="Amount must be positive")
+async def deduct_from_wallet(wallet: UpdateWalletAmount, audit: AuditContext, current_user: Person, db: AsyncSession):
+    if wallet.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    if current_user.role != Roles.CUSTOMER:
+        raise HTTPException(
+            status_code=403, detail="Don't have permission to change the amount of the wallet")
+
+    result = await db.execute(select(Person).where(Person.user_id == current_user.user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.person_status == PersonStatus.UNACTIVE:
+        raise HTTPException(
+            status_code=403, detail="The account is unactivated")
 
     result = await db.execute(select(Wallet).where(
-        Wallet.customer_id == current_user.user_id))
+        Wallet.customer_id == current_user.user_id).with_for_update())
 
     user_wallet = result.scalar_one_or_none()
 
@@ -69,63 +132,101 @@ async def deduct_from_wallet(amount: Decimal, current_user: Person, db: AsyncSes
         raise HTTPException(
             status_code=404, detail=f"Wallet not found for user {current_user.user_id}")
 
-    if user_wallet.wallet_balance < amount:
+    if user_wallet.wallet_balance < wallet.amount:
         raise HTTPException(
-            status_code=401, detail="wallet doesn't have enough balance")
+            status_code=401, detail=f"wallet {user_wallet.customer_id} doesn't have enough balance")
 
-    user_wallet.wallet_balance -= amount
+    old_value = {column.key: getattr(user_wallet, column.key)
+                 for column in inspect(Wallet).mapper.column_attrs}
+
+    user_wallet.wallet_balance -= wallet.amount
+    await db.flush()
+
+    new_value = {column.key: getattr(user_wallet, column.key)
+                 for column in inspect(Wallet).mapper.column_attrs}
+
+    old_value = make_json_format(old_value)
+    new_value = make_json_format(new_value)
 
     try:
-        end_time = datetime.now(UTC)
-        duration_time = (end_time - start_time).total_seconds()
-        info = {
-            "event": "Amount deducted successfully",
-            "method": "POST",
-            "path": "/Orders/add_order",
-            "user_id": user_wallet.customer_id,
-            "status_code": 200,
-            "duration_s": duration_time
-        }
-        logger.info(info)
+        await create_audit_log(
+            db=db,
+            audit=audit,
+            user_id=current_user.user_id,
+            entity_id=user_wallet.wallet_id,
+            entity_type="wallet",
+            event="WALLET_DEDUCTED",
+            old_value=old_value,
+            new_value=new_value
+        )
+
         await db.commit()
         await db.refresh(user_wallet)
+
         return user_wallet
-    except Exception as e:
-        end_time = datetime.now(UTC)
-        duration_time = (end_time - start_time).total_seconds()
-        error = {
-            "event": "Amount wasn't deducted successfully",
-            "method": "POST",
-            "path": "/Orders/add_order",
-            "user_id": user_wallet.customer_id,
-            "status_code": 200,
-            "duration_s": duration_time
-        }
-        logger.error(error)
-        await db.rollback()
-        raise e
+
+    except Exception:
+        logger.exception(
+            f"Deduction form wallet {user_wallet.wallet_id} failed")
+        raise
 
 
-async def get_remain_wallet_amount(current_user: Person, db: AsyncSession):
-    start_time = datetime.now(UTC)
-    result = await db.execute(select(Wallet).where(
-        Wallet.customer_id == current_user.user_id))
+async def get_remain_wallet_amount(filter_wallets: FilterWallets, current_user: Person, db: AsyncSession):
+    if current_user.role == Roles.CUSTOMER:
+        result = await db.execute(select(Person).where(Person.user_id == current_user.user_id))
+        user = result.scalar_one_or_none()
 
-    user_wallet = result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    if user_wallet is None:
+        if user.person_status == PersonStatus.UNACTIVE:
+            raise HTTPException(
+                status_code=403, detail="The account is unactivated")
+
+        result = await db.execute(select(Wallet).where(
+            Wallet.customer_id == current_user.user_id))
+
+        user_wallet = result.scalar_one_or_none()
+
+        if user_wallet is None:
+            raise HTTPException(
+                status_code=404, detail=f"Wallet not found for user {current_user.user_id}")
+
+        return GetWallets(wallets=[user_wallet], page=filter_wallets.page, page_size=filter_wallets.page_size, total=1, pages=1)
+
+    elif current_user.role == Roles.MANAGER or current_user.role == Roles.EMPLOYEE:
+        filters = []
+        if filter_wallets.wallet_id is not None:
+            filters.append(Wallet.wallet_id == filter_wallets.wallet_id)
+        if filter_wallets.customer_id is not None:
+            filters.append(Wallet.customer_id == filter_wallets.customer_id)
+        if filter_wallets.min_wallet_balance is not None:
+            filters.append(Wallet.wallet_balance >=
+                           filter_wallets.min_wallet_balance)
+        if filter_wallets.max_wallet_balance is not None:
+            filters.append(Wallet.wallet_balance <=
+                           filter_wallets.max_wallet_balance)
+
+        query = select(Wallet).where(*filters)
+        result = select(func.count()).select_from(query.subquery())
+        total = await db.scalar(result)
+        offset = (filter_wallets.page - 1)*filter_wallets.page_size
+
+        if filter_wallets.sort_order == SortOrder.ASC:
+            query = query.order_by(asc(filter_wallets.sort_by)).offset(
+                offset).limit(filter_wallets.page_size)
+        else:
+            query = query.order_by(desc(filter_wallets.sort_by)).offset(
+                offset).limit(filter_wallets.page_size)
+
+        result = await db.execute(query)
+        wallets = result.scalars().all()
+
+        if not wallets:
+            raise HTTPException(status_code=404, detail="No wallet found")
+
+        return GetWallets(wallets=wallets, page=filter_wallets.page, page_size=filter_wallets.page_size, total=total, pages=ceil(total/filter_wallets.page_size))
+
+    else:
         raise HTTPException(
-            status_code=404, detail=f"Wallet not found for user {current_user.user_id}")
-
-    end_time = datetime.now(UTC)
-    duration_time = (end_time - start_time).total_seconds()
-    info = {
-        "event": "Remain wallet amount sent successfully",
-        "method": "POST",
-        "path": "/Wallet/get_remain_wallet_amount",
-        "user_id": user_wallet.customer_id,
-        "status_code": 200,
-        "duration_s": duration_time
-    }
-    logger.info(info)
-    return user_wallet.wallet_balance
+            status_code=403, detail="Don't have premmision to get the amount of the wallet")
